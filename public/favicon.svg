@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="taxawuOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb923c" />
+      <stop offset="45%" stop-color="#f97316" />
+      <stop offset="100%" stop-color="#ea580c" />
+    </linearGradient>
+    <linearGradient id="gloss" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+
+  <!-- Fond carré arrondi Taxawou Orange -->
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#taxawuOrange)" stroke="#fdba74" stroke-width="0.8" />
+
+  <!-- Reflet brillant supérieur -->
+  <path d="M 6 18 C 6 10 10 6 18 6 L 46 6 C 54 6 58 10 58 18 C 58 26 44 31 32 31 C 18 31 6 26 6 18 Z" fill="url(#gloss)" />
+
+  <!-- Lettre T emblématique verte Taxawou -->
+  <path d="M 16 19 L 48 19 L 48 28 L 37 28 L 37 47 L 27 47 L 27 28 L 16 28 Z" fill="#15803d" />
+</svg>
