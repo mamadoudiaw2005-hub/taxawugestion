@@ -152,7 +152,7 @@ export interface Expense {
 export interface Debt {
   id: string;
   customerName: string;
-  customerPhone: string;
+  customerPhone?: string;
   amount: number;
   date: string;
   status: 'paid' | 'unpaid';

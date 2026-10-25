@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { useApp } from '../../context/AppContext';
 import { formatCurrency, formatDateTime } from '../../data/mockData';
 import type { Debt } from '../../types';
@@ -14,21 +13,40 @@ export default function Dettes({ hideHeader = false }: { hideHeader?: boolean })
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [debtAmount, setDebtAmount] = useState<number | ''>('');
+  const [debtDate, setDebtDate] = useState(() => new Date().toISOString().slice(0, 10));
 
-  const filteredDebts = debts.filter(d => d.customerName.toLowerCase().includes(search.toLowerCase()));
+  const filteredDebts = debts.filter(d => 
+    d.customerName.toLowerCase().includes(search.toLowerCase()) ||
+    (d.customerPhone && d.customerPhone.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const handleSelectCustomer = (name: string) => {
+    setCustomerName(name);
+    const existing = customers?.find(c => c.name.toLowerCase() === name.toLowerCase());
+    if (existing && existing.phone && !customerPhone) {
+      setCustomerPhone(existing.phone);
+    }
+  };
 
   const handleSaveDebt = () => {
-    if (!customerName.trim() || !customerPhone.trim() || !debtAmount) {
-      addToast({ title: 'Erreur', message: 'Veuillez renseigner le nom, le téléphone et le montant.', type: 'error' });
+    if (!customerName.trim() || !debtAmount || Number(debtAmount) <= 0) {
+      addToast({ title: 'Erreur', message: 'Veuillez renseigner le nom du client et le montant de la dette.', type: 'error' });
       return;
+    }
+
+    const selectedDateTime = debtDate ? new Date(debtDate) : new Date();
+    // Preserve current time if today
+    const now = new Date();
+    if (selectedDateTime.toDateString() === now.toDateString()) {
+      selectedDateTime.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
     }
 
     const newDebt: Debt = {
       id: `d${Date.now()}`,
-      customerName,
-      customerPhone,
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim() || undefined,
       amount: Number(debtAmount),
-      date: new Date().toISOString(),
+      date: selectedDateTime.toISOString(),
       status: 'unpaid',
     };
 
@@ -39,6 +57,7 @@ export default function Dettes({ hideHeader = false }: { hideHeader?: boolean })
     setCustomerName('');
     setCustomerPhone('');
     setDebtAmount('');
+    setDebtDate(new Date().toISOString().slice(0, 10));
     setShowModal(false);
   };
 
@@ -47,12 +66,12 @@ export default function Dettes({ hideHeader = false }: { hideHeader?: boolean })
     
     // Simplification du ticket de reçu (Ticket de caisse style)
     doc.setFontSize(16);
-    doc.text('TICKET DE CAISSE / REÇU', 105, 20, { align: 'center' });
+    doc.text('TICKET DE CAISSE / REÇU DE DETTE', 105, 20, { align: 'center' });
     
     doc.setFontSize(10);
     doc.text(`Identifiant: ${debt.id}`, 14, 30);
     doc.text(`Client: ${debt.customerName}`, 14, 36);
-    doc.text(`Téléphone: ${debt.customerPhone || 'N/A'}`, 14, 42);
+    doc.text(`Téléphone: ${debt.customerPhone || 'Non renseigné'}`, 14, 42);
     const dateObj = new Date(debt.date);
     doc.text(`Date: ${dateObj.toLocaleDateString('fr-FR')} ${dateObj.toLocaleTimeString('fr-FR')}`, 14, 48);
     
@@ -82,7 +101,7 @@ export default function Dettes({ hideHeader = false }: { hideHeader?: boolean })
           <div className="page-header-top">
             <div>
               <h1>Dettes</h1>
-              <p>Gérez les emprunts de produits et générez les décharges.</p>
+              <p>Gérez les emprunts de clients et générez les fiches de décharge.</p>
             </div>
             <button className="btn btn-primary" onClick={() => setShowModal(true)}>
               + Enregistrer une dette
@@ -104,7 +123,7 @@ export default function Dettes({ hideHeader = false }: { hideHeader?: boolean })
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
             <input 
               type="text" 
-              placeholder="Rechercher par client..." 
+              placeholder="Rechercher par client ou téléphone..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -126,7 +145,14 @@ export default function Dettes({ hideHeader = false }: { hideHeader?: boolean })
               {filteredDebts.map(debt => (
                 <tr key={debt.id}>
                   <td>{formatDateTime(debt.date)}</td>
-                  <td style={{ fontWeight: 600 }}>{debt.customerName}</td>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{debt.customerName}</div>
+                    {debt.customerPhone && (
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>
+                        📞 {debt.customerPhone}
+                      </div>
+                    )}
+                  </td>
                   <td style={{ fontWeight: 700, color: debt.status === 'paid' ? 'var(--color-success)' : 'var(--color-error)' }}>
                     {formatCurrency(debt.amount)}
                   </td>
@@ -176,16 +202,58 @@ export default function Dettes({ hideHeader = false }: { hideHeader?: boolean })
             
             <div className="modal-body">
               <div className="form-group">
-                <label className="form-label">Nom du client *</label>
-                <input type="text" className="form-input" placeholder="Ex: Moussa Diop" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+                <label className="form-label">Prénom & Nom du client *</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="Ex: Moussa Diop" 
+                  list="debts-customer-list"
+                  value={customerName} 
+                  onChange={e => handleSelectCustomer(e.target.value)} 
+                  autoFocus
+                />
+                {customers && customers.length > 0 && (
+                  <datalist id="debts-customer-list">
+                    {customers.map(c => (
+                      <option key={c.id} value={c.name}>{c.phone ? `(${c.phone})` : ''}</option>
+                    ))}
+                  </datalist>
+                )}
               </div>
+
               <div className="form-group">
-                <label className="form-label">Numéro de téléphone *</label>
-                <input type="text" className="form-input" placeholder="Ex: 77 123 45 67" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+                <label className="form-label">
+                  Numéro de téléphone <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optionnel / Facultatif)</span>
+                </label>
+                <input 
+                  type="tel" 
+                  className="form-input" 
+                  placeholder="Ex: 77 123 45 67 (facultatif)" 
+                  value={customerPhone} 
+                  onChange={e => setCustomerPhone(e.target.value)} 
+                />
               </div>
+
               <div className="form-group">
                 <label className="form-label">Montant de la dette ({currency}) *</label>
-                <input type="number" min="0" className="form-input" placeholder="Montant total" value={debtAmount} onChange={e => setDebtAmount(Number(e.target.value))} />
+                <input 
+                  type="number" 
+                  min="0" 
+                  className="form-input" 
+                  placeholder="Ex: 25000" 
+                  value={debtAmount} 
+                  onChange={e => setDebtAmount(e.target.value === '' ? '' : Number(e.target.value))} 
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Date de la dette</label>
+                <input 
+                  type="date" 
+                  className="form-input" 
+                  value={debtDate} 
+                  onChange={e => setDebtDate(e.target.value)} 
+                />
               </div>
             </div>
             
