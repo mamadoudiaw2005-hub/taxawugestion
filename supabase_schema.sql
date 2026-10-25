@@ -148,11 +148,14 @@ CREATE TABLE IF NOT EXISTS public.debts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     customer_name TEXT NOT NULL,
-    customer_phone TEXT NOT NULL,
+    customer_phone TEXT, -- Numéro de téléphone facultatif
     amount NUMERIC(15,2) NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'unpaid' CHECK (status IN ('paid', 'unpaid')),
     date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Si la table debts existe déjà dans votre Supabase, exécutez cette commande pour rendre le téléphone facultatif :
+-- ALTER TABLE public.debts ALTER COLUMN customer_phone DROP NOT NULL;
 
 -- 11. TABLE DES MOUVEMENTS DE STOCK
 CREATE TABLE IF NOT EXISTS public.stock_movements (
