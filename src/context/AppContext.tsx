@@ -278,7 +278,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           avatar: p.avatar_url || undefined,
           createdAt: p.created_at ? p.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
         }));
-        setUsers(mappedUsers);
+
+        // Conserver le Super Admin dans la liste si pas encore présent dans la table SQL
+        const hasSuperAdmin = mappedUsers.some(u => u.role === 'super_admin' || u.email === 'admin@taxawu.com');
+        const defaultSuperAdmin = mockUsers.find(u => u.role === 'super_admin');
+        const mergedUsers = (!hasSuperAdmin && defaultSuperAdmin) ? [defaultSuperAdmin, ...mappedUsers] : mappedUsers;
+
+        setUsers(mergedUsers);
       }
     } catch (e) {
       console.warn('Erreur chargement utilisateurs Supabase:', e);
@@ -304,6 +310,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createdAt: new Date().toISOString().split('T')[0]
     });
 
+    const syncProfileToSupabase = async (authUser: any) => {
+      if (!isSupabaseConfigured || !supabase || !authUser?.id) return;
+      try {
+        const name = authUser.user_metadata?.name || 
+                     authUser.user_metadata?.full_name || 
+                     authUser.email?.split('@')[0] || 
+                     'Utilisateur';
+        const avatarUrl = authUser.user_metadata?.avatar_url || 
+                          authUser.user_metadata?.picture || 
+                          null;
+        const shopName = authUser.user_metadata?.shopName || 
+                         authUser.user_metadata?.shop_name || 
+                         ('Boutique ' + name);
+
+        await supabase.from('profiles').upsert({
+          id: authUser.id,
+          name: name,
+          email: authUser.email || '',
+          role: authUser.user_metadata?.role || 'admin',
+          shop_name: shopName,
+          avatar_url: avatarUrl,
+          status: 'active'
+        }, { onConflict: 'id' });
+      } catch (err) {
+        console.warn('Sync profile to Supabase warning:', err);
+      }
+    };
+
     // Purge toute ancienne session Supabase persistante dans le localStorage
     try {
       Object.keys(localStorage).forEach(key => {
@@ -315,9 +349,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // ignore
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setCurrentUser(extractProfile(session.user));
+        await syncProfileToSupabase(session.user);
       } else {
         const sessionUser = loadSessionInitial<User | null>('currentUser', null);
         if (sessionUser && sessionUser.role !== 'super_admin') {
@@ -331,9 +366,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setIsLoadingAuth(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setCurrentUser(extractProfile(session.user));
+        await syncProfileToSupabase(session.user);
         refreshUsers();
       } else if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
