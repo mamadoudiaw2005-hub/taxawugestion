@@ -45,7 +45,8 @@ export default function Profile() {
 
       // 1. Mettre à jour l'état local et la mémoire
       setCurrentUser(updatedUser);
-      localStorage.setItem('taxawou_currentUser', JSON.stringify(updatedUser));
+      sessionStorage.setItem('taxawou_currentUser', JSON.stringify(updatedUser));
+      localStorage.removeItem('taxawou_currentUser');
       setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
 
       // 2. Synchroniser sur Supabase (Auth + Table profiles)

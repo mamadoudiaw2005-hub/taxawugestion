@@ -134,6 +134,18 @@ function loadInitial<T>(key: string, fallback: T): T {
   return fallback;
 }
 
+function loadSessionInitial<T>(key: string, fallback: T): T {
+  try {
+    const saved = sessionStorage.getItem(`taxawou_${key}`);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error(`Failed to load taxawou_${key} from sessionStorage:`, e);
+  }
+  return fallback;
+}
+
 const defaultPlatformSettings: PlatformSettings = {
   phone: '+221 77 000 00 00',
   whatsapp: 'https://wa.me/221770000000',
@@ -188,7 +200,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings>(loadPlatformSettings);
 
   const [users, setUsers] = useState<User[]>(() => loadInitial('users', mockUsers));
-  const [currentUser, setCurrentUser] = useState<User | null>(() => loadInitial<User | null>('currentUser', null));
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      localStorage.removeItem('taxawou_currentUser');
+    } catch (e) {
+      // ignore
+    }
+    return loadSessionInitial<User | null>('currentUser', null);
+  });
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
   const currentUserId = currentUser?.id || 'u1';
@@ -285,9 +304,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createdAt: new Date().toISOString().split('T')[0]
     });
 
+    // Purge toute ancienne session Supabase persistante dans le localStorage
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (e) {
+      // ignore
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setCurrentUser(extractProfile(session.user));
+      } else {
+        const sessionUser = loadSessionInitial<User | null>('currentUser', null);
+        if (sessionUser && sessionUser.role !== 'super_admin') {
+          setCurrentUser(null);
+          sessionStorage.removeItem('taxawou_currentUser');
+        }
       }
       setIsLoadingAuth(false);
       refreshUsers();
@@ -301,6 +337,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         refreshUsers();
       } else if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
+        sessionStorage.removeItem('taxawou_currentUser');
       }
       setIsLoadingAuth(false);
     });
@@ -320,6 +357,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
     setCurrentUser(null);
+    sessionStorage.removeItem('taxawou_currentUser');
     localStorage.removeItem('taxawou_currentUser');
   }, []);
 
@@ -362,7 +400,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => { localStorage.setItem(`taxawou_${currentUserId}_purchases`, JSON.stringify(purchases)); }, [purchases, currentUserId]);
   useEffect(() => { localStorage.setItem(`taxawou_${currentUserId}_stockMovements`, JSON.stringify(stockMovements)); }, [stockMovements, currentUserId]);
   useEffect(() => { localStorage.setItem('taxawou_users', JSON.stringify(users)); }, [users]);
-  useEffect(() => { localStorage.setItem('taxawou_currentUser', JSON.stringify(currentUser)); }, [currentUser]);
+  useEffect(() => {
+    if (currentUser) {
+      sessionStorage.setItem('taxawou_currentUser', JSON.stringify(currentUser));
+    } else {
+      sessionStorage.removeItem('taxawou_currentUser');
+    }
+    localStorage.removeItem('taxawou_currentUser');
+  }, [currentUser]);
   useEffect(() => { localStorage.setItem('taxawou_notifications', JSON.stringify(notifications)); }, [notifications]);
 
   const toggleSidebar = useCallback(() => {
@@ -475,7 +520,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const switchUser = useCallback((user: User) => {
     setCurrentUser(user);
-    localStorage.setItem('taxawou_currentUser', JSON.stringify(user));
+    sessionStorage.setItem('taxawou_currentUser', JSON.stringify(user));
+    localStorage.removeItem('taxawou_currentUser');
   }, []);
 
   const setCurrency = useCallback((newCurrency: string) => {
