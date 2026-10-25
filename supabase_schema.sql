@@ -186,14 +186,15 @@ ALTER TABLE public.debts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stock_movements ENABLE ROW LEVEL SECURITY;
 
 -- Politiques RLS (Chaque utilisateur accède uniquement à ses propres enregistrements)
--- Pour les profils : lecture permise aux utilisateurs connectés pour l'annuaire d'équipe / admin
+-- Pour les profils : lecture permise pour l'annuaire d'équipe / admin (y compris compte super admin)
 DROP POLICY IF EXISTS "Users can manage own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Authenticated users can view profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Anyone can view profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 
-CREATE POLICY "Authenticated users can view profiles" ON public.profiles 
-FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Anyone can view profiles" ON public.profiles 
+FOR SELECT USING (true);
 
 CREATE POLICY "Users can update own profile" ON public.profiles 
 FOR UPDATE TO authenticated USING (auth.uid() = id);
@@ -268,3 +269,22 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- =========================================================================
+-- SYNCHRONISER IMMÉDIATEMENT LES COMPTES GOOGLE / EMAIL DÉJÀ INSCRITS
+-- =========================================================================
+-- Exécutez cette commande pour insérer dans public.profiles tous les utilisateurs
+-- qui se sont connectés avec Google ou email avant la mise en place du trigger :
+INSERT INTO public.profiles (id, name, email, role, shop_name, avatar_url)
+SELECT 
+    id,
+    COALESCE(raw_user_meta_data->>'name', raw_user_meta_data->>'full_name', split_part(email, '@', 1)),
+    email,
+    COALESCE(raw_user_meta_data->>'role', 'admin'),
+    COALESCE(raw_user_meta_data->>'shopName', 'Ma Boutique'),
+    COALESCE(raw_user_meta_data->>'avatar_url', raw_user_meta_data->>'picture', NULL)
+FROM auth.users
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    avatar_url = EXCLUDED.avatar_url;
+
