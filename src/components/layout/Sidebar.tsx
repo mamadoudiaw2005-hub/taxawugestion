@@ -84,28 +84,32 @@ export default function Sidebar() {
 
   const isCollapsed = sidebarCollapsed && !mobileSidebarOpen;
 
+  const handleNavClick = () => {
+    setMobileSidebarOpen(false);
+  };
+
   return (
     <>
       {mobileSidebarOpen && (
         <div 
           className="sidebar-overlay" 
-          onClick={() => setMobileSidebarOpen(false)} 
-          onTouchStart={() => setMobileSidebarOpen(false)}
+          onClick={handleNavClick} 
+          onTouchStart={handleNavClick}
           aria-hidden="true"
         />
       )}
       <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${mobileSidebarOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-logo">T</div>
-          <div className="sidebar-brand">
+          <div className="sidebar-brand" onClick={handleNavClick} style={{ cursor: 'pointer' }}>
             <h1>Taxawou</h1>
             <p>Pilotage de votre activité</p>
           </div>
           <button 
             type="button" 
             className="sidebar-mobile-close" 
-            onClick={() => setMobileSidebarOpen(false)} 
-            onTouchStart={() => setMobileSidebarOpen(false)}
+            onClick={handleNavClick} 
+            onTouchStart={handleNavClick}
             aria-label="Fermer le menu"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -150,7 +154,8 @@ export default function Sidebar() {
                           to={child.path}
                           className={`sidebar-link ${isActive(child.path) ? 'active' : ''}`}
                           style={{ padding: '8px 12px', fontSize: '0.9rem' }}
-                          onClick={() => setMobileSidebarOpen(false)}
+                          onClick={handleNavClick}
+                          onTouchEnd={handleNavClick}
                         >
                           <span className="sidebar-link-text">{child.label}</span>
                         </NavLink>
@@ -166,7 +171,8 @@ export default function Sidebar() {
                   key={item.path}
                   to={item.path}
                   className={`sidebar-link ${isActive(item.path) ? 'active' : ''}`}
-                  onClick={() => setMobileSidebarOpen(false)}
+                  onClick={handleNavClick}
+                  onTouchEnd={handleNavClick}
                 >
                   <span className="sidebar-link-icon">
                     {item.icon && icons[item.icon]}

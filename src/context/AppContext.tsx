@@ -126,6 +126,16 @@ function loadInitial<T>(key: string, fallback: T): T {
   try {
     const saved = localStorage.getItem(`taxawou_${key}`);
     if (saved) {
+      // Purge automatique des anciennes données de démo (catégories/produits mockés résiduels en cache)
+      if (
+        saved.includes('"id":"cat1"') || 
+        saved.includes('"id":"p1"') || 
+        saved.includes('RIZ-001') || 
+        saved.includes('Patisen SA')
+      ) {
+        localStorage.removeItem(`taxawou_${key}`);
+        return fallback;
+      }
       return JSON.parse(saved);
     }
   } catch (e) {

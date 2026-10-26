@@ -2004,6 +2004,20 @@ img {
     flex-direction: column !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  .sidebar,
+  .sidebar *,
+  .sidebar-link,
+  .sidebar-submenu {
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
   }
 
   .sidebar.mobile-open,
@@ -2224,11 +2238,19 @@ img {
     gap: 12px !important;
   }
 
-  .page-header-top > div:last-child {
+  .page-header-top > div:last-child,
+  .page-header-actions {
     width: 100% !important;
     display: flex !important;
-    flex-wrap: wrap !important;
+    flex-direction: column !important;
     gap: 8px !important;
+  }
+
+  .page-header-top > div:last-child .btn,
+  .page-header-actions .btn {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 10px 14px !important;
   }
 
   .data-table-wrapper {

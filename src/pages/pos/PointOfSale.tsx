@@ -106,13 +106,20 @@ export default function PointOfSale() {
           </div>
         </div>
         <div className="pos-products-grid">
-          {products.map(product => (
-            <div key={product.id} className="pos-product-card" onClick={() => addToCart(product)}>
-              <div className="pos-product-name" title={product.name}>{product.name}</div>
-              <div className="pos-product-price">{formatCurrency(product.sellPrice)}</div>
-              <div className="pos-product-stock">Stock: {product.stock} {product.unit}</div>
+          {products.length === 0 ? (
+            <div style={{ gridColumn: '1 / -1', padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <p style={{ fontWeight: 600, fontSize: 15, marginBottom: 6, color: 'var(--text-primary)' }}>Aucun produit disponible en caisse</p>
+              <p style={{ fontSize: 13 }}>Ajoutez d'abord vos articles dans le Catalogue pour pouvoir enregistrer des ventes.</p>
             </div>
-          ))}
+          ) : (
+            products.map(product => (
+              <div key={product.id} className="pos-product-card" onClick={() => addToCart(product)}>
+                <div className="pos-product-name" title={product.name}>{product.name}</div>
+                <div className="pos-product-price">{formatCurrency(product.sellPrice)}</div>
+                <div className="pos-product-stock">Stock: {product.stock} {product.unit}</div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
