@@ -1,4 +1,4 @@
-import React, { JSX, useState } from 'react';
+import React, { JSX, useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 
@@ -55,6 +55,11 @@ export default function Sidebar() {
   const location = useLocation();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
+  // Fermer systématiquement le tiroir de navigation mobile à chaque changement de page
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname, setMobileSidebarOpen]);
+
   const allNavItems = [
     ...navItems,
     ...(isSuperAdmin ? [
@@ -82,7 +87,12 @@ export default function Sidebar() {
   return (
     <>
       {mobileSidebarOpen && (
-        <div className="sidebar-overlay" onClick={() => setMobileSidebarOpen(false)} />
+        <div 
+          className="sidebar-overlay" 
+          onClick={() => setMobileSidebarOpen(false)} 
+          onTouchStart={() => setMobileSidebarOpen(false)}
+          aria-hidden="true"
+        />
       )}
       <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${mobileSidebarOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
@@ -95,6 +105,7 @@ export default function Sidebar() {
             type="button" 
             className="sidebar-mobile-close" 
             onClick={() => setMobileSidebarOpen(false)} 
+            onTouchStart={() => setMobileSidebarOpen(false)}
             aria-label="Fermer le menu"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

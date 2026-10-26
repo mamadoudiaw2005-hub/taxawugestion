@@ -210,7 +210,7 @@ function loadPlatformSettings(): PlatformSettings {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>(() => loadInitial('notifications', mockNotifications));
+  const [notifications, setNotifications] = useState<Notification[]>(() => loadInitial('notifications', []));
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('theme');
@@ -219,7 +219,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings>(loadPlatformSettings);
 
-  const [users, setUsers] = useState<User[]>(() => loadInitial('users', mockUsers));
+  const [users, setUsers] = useState<User[]>(() => loadInitial('users', []));
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       localStorage.removeItem('taxawou_currentUser');
@@ -230,35 +230,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
-  const currentUserId = currentUser?.id || 'u1';
+  const currentUserId = currentUser?.id || 'u_default';
 
-  // Multi-tenant isolated entities
+  // Multi-tenant isolated entities (clean start for real stores)
   const [products, setProducts] = useState<Product[]>(() => 
-    loadInitial(`${currentUserId}_products`, currentUserId === 'u1' ? (loadInitial('products', mockProducts)) : [])
+    loadInitial(`${currentUserId}_products`, [])
   );
   const [categories, setCategories] = useState<Category[]>(() => 
-    loadInitial(`${currentUserId}_categories`, mockCategories)
+    loadInitial(`${currentUserId}_categories`, [])
   );
   const [customers, setCustomers] = useState<Customer[]>(() => 
-    loadInitial(`${currentUserId}_customers`, currentUserId === 'u1' ? (loadInitial('customers', mockCustomers)) : [])
+    loadInitial(`${currentUserId}_customers`, [])
   );
   const [suppliers, setSuppliers] = useState<Supplier[]>(() => 
-    loadInitial(`${currentUserId}_suppliers`, currentUserId === 'u1' ? (loadInitial('suppliers', mockSuppliers)) : [])
+    loadInitial(`${currentUserId}_suppliers`, [])
   );
   const [expenses, setExpenses] = useState<Expense[]>(() => 
-    loadInitial(`${currentUserId}_expenses`, currentUserId === 'u1' ? (loadInitial('expenses', mockExpenses)) : [])
+    loadInitial(`${currentUserId}_expenses`, [])
   );
   const [debts, setDebts] = useState<Debt[]>(() => 
-    loadInitial(`${currentUserId}_debts`, currentUserId === 'u1' ? (loadInitial('debts', mockDebts)) : [])
+    loadInitial(`${currentUserId}_debts`, [])
   );
   const [sales, setSales] = useState<Sale[]>(() => 
-    loadInitial(`${currentUserId}_sales`, currentUserId === 'u1' ? (loadInitial('sales', mockSales)) : [])
+    loadInitial(`${currentUserId}_sales`, [])
   );
   const [purchases, setPurchases] = useState<Purchase[]>(() => 
-    loadInitial(`${currentUserId}_purchases`, currentUserId === 'u1' ? (loadInitial('purchases', mockPurchases)) : [])
+    loadInitial(`${currentUserId}_purchases`, [])
   );
   const [stockMovements, setStockMovements] = useState<StockMovement[]>(() => 
-    loadInitial(`${currentUserId}_stockMovements`, currentUserId === 'u1' ? (loadInitial('stockMovements', mockStockMovements)) : [])
+    loadInitial(`${currentUserId}_stockMovements`, [])
   );
 
   const [currency, setCurrencyState] = useState<string>(() => {
@@ -421,15 +421,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!currentUser) return;
     const uid = currentUser.id;
-    setProducts(loadInitial(`${uid}_products`, uid === 'u1' ? (loadInitial('products', mockProducts)) : []));
-    setCategories(loadInitial(`${uid}_categories`, mockCategories));
-    setCustomers(loadInitial(`${uid}_customers`, uid === 'u1' ? (loadInitial('customers', mockCustomers)) : []));
-    setSuppliers(loadInitial(`${uid}_suppliers`, uid === 'u1' ? (loadInitial('suppliers', mockSuppliers)) : []));
-    setExpenses(loadInitial(`${uid}_expenses`, uid === 'u1' ? (loadInitial('expenses', mockExpenses)) : []));
-    setDebts(loadInitial(`${uid}_debts`, uid === 'u1' ? (loadInitial('debts', mockDebts)) : []));
-    setSales(loadInitial(`${uid}_sales`, uid === 'u1' ? (loadInitial('sales', mockSales)) : []));
-    setPurchases(loadInitial(`${uid}_purchases`, uid === 'u1' ? (loadInitial('purchases', mockPurchases)) : []));
-    setStockMovements(loadInitial(`${uid}_stockMovements`, uid === 'u1' ? (loadInitial('stockMovements', mockStockMovements)) : []));
+    setProducts(loadInitial(`${uid}_products`, []));
+    setCategories(loadInitial(`${uid}_categories`, []));
+    setCustomers(loadInitial(`${uid}_customers`, []));
+    setSuppliers(loadInitial(`${uid}_suppliers`, []));
+    setExpenses(loadInitial(`${uid}_expenses`, []));
+    setDebts(loadInitial(`${uid}_debts`, []));
+    setSales(loadInitial(`${uid}_sales`, []));
+    setPurchases(loadInitial(`${uid}_purchases`, []));
+    setStockMovements(loadInitial(`${uid}_stockMovements`, []));
 
     const savedSettings = loadInitial<ShopSettings | null>(`${uid}_shop_settings`, null);
     const userCurr = localStorage.getItem(`taxawou_${uid}_currency`) || savedSettings?.currency || localStorage.getItem('taxawou_currency') || 'FCFA';
@@ -465,6 +465,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('taxawou_currentUser');
   }, [currentUser]);
   useEffect(() => { localStorage.setItem('taxawou_notifications', JSON.stringify(notifications)); }, [notifications]);
+
+  // Générer des notifications dynamiques basées uniquement sur les données réelles de la boutique
+  useEffect(() => {
+    if (!currentUser) {
+      setNotifications([]);
+      return;
+    }
+
+    const realNotifs: Notification[] = [];
+
+    // 1. Alertes de stock critique sur les vrais produits de la boutique
+    products.forEach(p => {
+      const threshold = p.minStock !== undefined && p.minStock !== null ? p.minStock : 5;
+      if (p.stock <= threshold) {
+        realNotifs.push({
+          id: `stock_${p.id}`,
+          title: 'Stock critique',
+          message: `${p.name} est presque épuisé (reste ${p.stock} ${p.unit || 'article(s)'})`,
+          type: 'warning',
+          createdAt: new Date().toISOString(),
+          read: false
+        });
+      }
+    });
+
+    // 2. Alertes de dettes impayées réelles
+    debts.forEach(d => {
+      if (d.status === 'unpaid') {
+        realNotifs.push({
+          id: `debt_${d.id}`,
+          title: 'Dette impayée',
+          message: `Dette en attente de règlement pour ${d.customerName || 'Client'} (${formatCurrency(d.amount)})`,
+          type: 'error',
+          createdAt: d.date || new Date().toISOString(),
+          read: false
+        });
+      }
+    });
+
+    setNotifications(realNotifs);
+  }, [products, debts, currentUser]);
 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed(prev => !prev);

@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { mockNotifications } from '../../data/mockData';
 
 const pageTitles: Record<string, { section: string; title: string }> = {
   '/dashboard': { section: 'MA BOUTIQUE', title: 'Bonjour, bienvenue.' },
@@ -32,13 +31,6 @@ export default function Topbar() {
   const profileRef = useRef<HTMLDivElement>(null);
 
   const pageInfo = pageTitles[location.pathname] || { section: '', title: '' };
-  
-  // Initialize notifications
-  useEffect(() => {
-    if (notifications.length === 0) {
-      setNotifications(mockNotifications);
-    }
-  }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -139,18 +131,24 @@ export default function Topbar() {
                 )}
               </div>
               <div className="notifications-list">
-                {notifications.map(notif => (
-                  <div key={notif.id} className={`notification-item ${!notif.read ? 'unread' : ''}`}>
-                    <div className={`notification-dot ${notif.type}`} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>{notif.title}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{notif.message}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                        {new Date(notif.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                {notifications.length === 0 ? (
+                  <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                    Aucune nouvelle notification
+                  </div>
+                ) : (
+                  notifications.map(notif => (
+                    <div key={notif.id} className={`notification-item ${!notif.read ? 'unread' : ''}`}>
+                      <div className={`notification-dot ${notif.type}`} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>{notif.title}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{notif.message}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                          {notif.createdAt ? new Date(notif.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Récemment'}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           )}

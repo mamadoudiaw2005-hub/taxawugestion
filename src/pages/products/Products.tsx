@@ -208,8 +208,14 @@ export default function Products({ hideHeader = false }: { hideHeader?: boolean 
                 <tr>
                   <td colSpan={7}>
                     <div className="empty-state">
-                      <div className="empty-state-title">Aucun produit trouvé</div>
-                      <div className="empty-state-text">Modifiez vos critères de recherche.</div>
+                      <div className="empty-state-title">
+                        {products.length === 0 ? 'Votre catalogue est vide' : 'Aucun produit trouvé'}
+                      </div>
+                      <div className="empty-state-text">
+                        {products.length === 0 
+                          ? 'Cliquez sur « + Ajouter un produit » pour enregistrer votre premier article.'
+                          : 'Modifiez vos critères de recherche.'}
+                      </div>
                     </div>
                   </td>
                 </tr>

@@ -16,6 +16,22 @@ declare global {
   }
 }
 
+/**
+ * Validation stricte du format email (RFC 5322 standard)
+ * Rejette les faux emails, adresses sans extension (.com, .sn, etc.) ou avec syntaxe erronée
+ */
+const isValidEmail = (email: string): boolean => {
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+  if (!email || !emailRegex.test(email)) return false;
+  const parts = email.split('@');
+  if (parts.length !== 2) return false;
+  const domain = parts[1];
+  const domainParts = domain.split('.');
+  if (domainParts.length < 2) return false;
+  const tld = domainParts[domainParts.length - 1];
+  return tld.length >= 2;
+};
+
 export default function AuthModal({ initialTab = 'login', onClose }: AuthModalProps) {
   const [activeTab, setActiveTab] = useState<'login' | 'register'>(initialTab);
   const [showPassword, setShowPassword] = useState(false);
@@ -133,6 +149,13 @@ export default function AuthModal({ initialTab = 'login', onClose }: AuthModalPr
       const msg = 'Veuillez saisir votre adresse email et votre mot de passe.';
       setErrorMessage(msg);
       addToast({ title: 'Erreur', message: msg, type: 'error' });
+      return;
+    }
+
+    if (!isValidEmail(emailClean)) {
+      const msg = 'Veuillez saisir une adresse e-mail valide (ex: contact@exemple.com).';
+      setErrorMessage(msg);
+      addToast({ title: 'Format e-mail invalide', message: msg, type: 'error' });
       return;
     }
 
@@ -256,6 +279,13 @@ export default function AuthModal({ initialTab = 'login', onClose }: AuthModalPr
 
     if (!nameClean || !emailClean || !registerPassword.trim()) {
       addToast({ title: 'Champs obligatoires', message: 'Veuillez remplir tous les champs du formulaire.', type: 'error' });
+      return;
+    }
+
+    if (!isValidEmail(emailClean)) {
+      const msg = 'Veuillez saisir une adresse e-mail valide (ex: contact@exemple.com).';
+      setErrorMessage(msg);
+      addToast({ title: 'Format e-mail invalide', message: msg, type: 'error' });
       return;
     }
 
@@ -395,8 +425,8 @@ export default function AuthModal({ initialTab = 'login', onClose }: AuthModalPr
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = forgotEmail.trim().toLowerCase();
-    if (!cleanEmail) {
-      addToast({ title: 'Erreur', message: 'Veuillez saisir votre adresse e-mail.', type: 'error' });
+    if (!cleanEmail || !isValidEmail(cleanEmail)) {
+      addToast({ title: 'E-mail invalide', message: 'Veuillez saisir une adresse e-mail valide (ex: contact@exemple.com).', type: 'error' });
       return;
     }
     setIsSubmitting(true);

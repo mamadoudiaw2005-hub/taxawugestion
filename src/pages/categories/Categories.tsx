@@ -116,6 +116,16 @@ export default function Categories({ hideHeader = false }: { hideHeader?: boolea
                 </td>
               </tr>
             ))}
+            {categories.length === 0 && (
+              <tr>
+                <td colSpan={5}>
+                  <div className="empty-state" style={{ padding: '32px 16px', textAlign: 'center' }}>
+                    <div className="empty-state-title">Aucune catégorie pour le moment</div>
+                    <div className="empty-state-text">Cliquez sur « + Nouvelle Catégorie » pour organiser vos produits.</div>
+                  </div>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
