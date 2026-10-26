@@ -148,7 +148,7 @@ function loadSessionInitial<T>(key: string, fallback: T): T {
 
 const defaultPlatformSettings: PlatformSettings = {
   phone: '+221 77 000 00 00',
-  whatsapp: 'https://wa.me/221770000000',
+  whatsapp: '+221 77 000 00 00',
   instagram: 'https://instagram.com/taxawu_gestion',
   email: 'contact@taxawu.com',
   facebook: 'https://facebook.com/taxawugestion',
@@ -175,12 +175,32 @@ const defaultShopSettings: ShopSettings = {
   autoChange: true
 };
 
+const cleanWhatsAppNumber = (val: string): string => {
+  if (!val) return '+221 77 000 00 00';
+  if (val.includes('wa.me/')) {
+    const raw = val.split('wa.me/')[1]?.split('?')[0]?.replace(/\D/g, '') || '';
+    if (raw.startsWith('221') && raw.length >= 12) {
+      return `+${raw.slice(0, 3)} ${raw.slice(3, 5)} ${raw.slice(5, 8)} ${raw.slice(8, 10)} ${raw.slice(10, 12)}`;
+    }
+    return raw ? `+${raw}` : '+221 77 000 00 00';
+  }
+  return val;
+};
+
 function loadPlatformSettings(): PlatformSettings {
   try {
     const saved = localStorage.getItem('taxawou_platform_settings');
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.whatsapp) parsed.whatsapp = cleanWhatsAppNumber(parsed.whatsapp);
+      return { ...defaultPlatformSettings, ...parsed };
+    }
     const legacy = localStorage.getItem('footerContacts');
-    if (legacy) return { ...defaultPlatformSettings, ...JSON.parse(legacy) };
+    if (legacy) {
+      const parsed = JSON.parse(legacy);
+      if (parsed.whatsapp) parsed.whatsapp = cleanWhatsAppNumber(parsed.whatsapp);
+      return { ...defaultPlatformSettings, ...parsed };
+    }
   } catch (e) {
     console.error('Failed to load platform settings', e);
   }

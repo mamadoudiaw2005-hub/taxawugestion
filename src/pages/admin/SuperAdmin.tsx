@@ -43,8 +43,31 @@ export default function SuperAdmin() {
     return null;
   }
 
+  const cleanPhone = (val: string) => {
+    if (!val) return '';
+    if (val.includes('wa.me/')) {
+      const raw = val.split('wa.me/')[1]?.split('?')[0]?.replace(/\D/g, '') || '';
+      if (raw.startsWith('221') && raw.length >= 12) {
+        return `+${raw.slice(0, 3)} ${raw.slice(3, 5)} ${raw.slice(5, 8)} ${raw.slice(8, 10)} ${raw.slice(10, 12)}`;
+      }
+      return raw ? `+${raw}` : val;
+    }
+    return val;
+  };
+
   // Contact form state
-  const [formData, setFormData] = useState<PlatformSettings>(platformSettings);
+  const [formData, setFormData] = useState<PlatformSettings>(() => ({
+    ...platformSettings,
+    whatsapp: cleanPhone(platformSettings.whatsapp)
+  }));
+
+  React.useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      ...platformSettings,
+      whatsapp: cleanPhone(platformSettings.whatsapp)
+    }));
+  }, [platformSettings]);
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
@@ -262,7 +285,7 @@ export default function SuperAdmin() {
 
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
-                  💬 Lien WhatsApp officiel
+                  💬 Numéro de téléphone WhatsApp
                 </label>
                 <input 
                   type="text"
@@ -270,9 +293,12 @@ export default function SuperAdmin() {
                   onChange={e => setFormData({ ...formData, whatsapp: e.target.value })}
                   className="form-control"
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)' }}
-                  placeholder="https://wa.me/221770000000"
+                  placeholder="+221 77 000 00 00"
                   required
                 />
+                <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
+                  Le lien direct de discussion WhatsApp (wa.me) sera généré automatiquement.
+                </span>
               </div>
 
               <div>
