@@ -6,7 +6,7 @@ import { formatCurrency, formatDateTime } from '../../data/mockData';
 import type { Expense } from '../../types';
 
 export default function Expenses({ hideHeader = false }: { hideHeader?: boolean }) {
-  const { expenses, setExpenses, deleteExpense, addToast, currency } = useApp();
+  const { expenses, setExpenses, deleteExpense, addToast, currency, isSuspended, checkCanPerformAction } = useApp();
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
 
@@ -22,7 +22,7 @@ export default function Expenses({ hideHeader = false }: { hideHeader?: boolean 
   const downloadSummaryPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(16);
-    doc.text('Facture des Dépenses - Taxawou Gestion', 14, 20);
+    doc.text('Facture des Dépenses - Taxawu Gestion', 14, 20);
     doc.setFontSize(10);
     doc.text(`Généré le : ${formatDateTime(new Date().toISOString())}`, 14, 28);
     
@@ -67,11 +67,13 @@ export default function Expenses({ hideHeader = false }: { hideHeader?: boolean 
   };
 
   const openNew = () => {
+    if (!checkCanPerformAction("l'enregistrement de dépense")) return;
     resetForm();
     setShowModal(true);
   };
 
   const handleSubmit = () => {
+    if (!checkCanPerformAction("l'enregistrement de dépense")) return;
     if (!formDesc.trim() || !formAmount || isNaN(Number(formAmount))) {
       addToast({ title: 'Erreur', message: 'La description et un montant valide sont obligatoires.', type: 'error' });
       return;
@@ -94,6 +96,7 @@ export default function Expenses({ hideHeader = false }: { hideHeader?: boolean 
   };
 
   const handleDelete = (id: string) => {
+    if (!checkCanPerformAction("la suppression de dépense")) return;
     deleteExpense(id);
     addToast({ title: 'Dépense supprimée', message: 'La dépense a été retirée.', type: 'success' });
   };
@@ -112,7 +115,13 @@ export default function Expenses({ hideHeader = false }: { hideHeader?: boolean 
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '8px', display: 'inline-block', verticalAlign: 'middle' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Télécharger PDF
               </button>
-              <button className="btn btn-primary" onClick={openNew}>
+              <button 
+                className="btn btn-primary" 
+                onClick={openNew}
+                disabled={isSuspended}
+                style={{ opacity: isSuspended ? 0.6 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }}
+                title={isSuspended ? "Action bloquée : Compte suspendu" : undefined}
+              >
                 + Enregistrer une dépense
               </button>
             </div>
@@ -125,7 +134,13 @@ export default function Expenses({ hideHeader = false }: { hideHeader?: boolean 
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '8px', display: 'inline-block', verticalAlign: 'middle' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Télécharger PDF
           </button>
-          <button className="btn btn-primary" onClick={openNew}>
+          <button 
+            className="btn btn-primary" 
+            onClick={openNew}
+            disabled={isSuspended}
+            style={{ opacity: isSuspended ? 0.6 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }}
+            title={isSuspended ? "Action bloquée : Compte suspendu" : undefined}
+          >
             + Enregistrer une dépense
           </button>
         </div>
@@ -168,7 +183,13 @@ export default function Expenses({ hideHeader = false }: { hideHeader?: boolean 
                     <button className="btn-ghost" style={{ padding: '4px', color: 'var(--primary)' }} onClick={() => downloadExpensePDF(expense)} title="Télécharger">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     </button>
-                    <button className="btn-ghost" style={{ padding: '4px', color: 'var(--color-error)' }} onClick={() => handleDelete(expense.id)} title="Supprimer">
+                    <button 
+                      className="btn-ghost" 
+                      style={{ padding: '4px', color: 'var(--color-error)', opacity: isSuspended ? 0.4 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }} 
+                      onClick={() => handleDelete(expense.id)} 
+                      disabled={isSuspended}
+                      title={isSuspended ? "Compte suspendu : Suppression impossible" : "Supprimer"}
+                    >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                     </button>
                   </td>

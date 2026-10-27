@@ -5,7 +5,7 @@ import { formatCurrency, formatDateTime } from '../../data/mockData';
 import type { Debt } from '../../types';
 
 export default function Dettes({ hideHeader = false }: { hideHeader?: boolean }) {
-  const { debts, setDebts, deleteDebt, toggleDebtStatus, customers, addToast, currency } = useApp();
+  const { debts, setDebts, deleteDebt, toggleDebtStatus, customers, addToast, currency, isSuspended, checkCanPerformAction } = useApp();
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -28,7 +28,13 @@ export default function Dettes({ hideHeader = false }: { hideHeader?: boolean })
     }
   };
 
+  const handleOpenModal = () => {
+    if (!checkCanPerformAction("l'enregistrement de dette")) return;
+    setShowModal(true);
+  };
+
   const handleSaveDebt = () => {
+    if (!checkCanPerformAction("l'enregistrement de dette")) return;
     if (!customerName.trim() || !debtAmount || Number(debtAmount) <= 0) {
       addToast({ title: 'Erreur', message: 'Veuillez renseigner le nom du client et le montant de la dette.', type: 'error' });
       return;
@@ -90,6 +96,7 @@ export default function Dettes({ hideHeader = false }: { hideHeader?: boolean })
   };
 
   const handleDeleteDebt = (id: string) => {
+    if (!checkCanPerformAction("la suppression de dette")) return;
     deleteDebt(id);
     addToast({ title: 'Dette supprimée', message: 'La dette a été retirée.', type: 'success' });
   };
@@ -103,7 +110,13 @@ export default function Dettes({ hideHeader = false }: { hideHeader?: boolean })
               <h1>Dettes</h1>
               <p>Gérez les emprunts de clients et générez les fiches de décharge.</p>
             </div>
-            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <button 
+              className="btn btn-primary" 
+              onClick={handleOpenModal}
+              disabled={isSuspended}
+              style={{ opacity: isSuspended ? 0.6 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }}
+              title={isSuspended ? "Action bloquée : Compte suspendu" : undefined}
+            >
               + Enregistrer une dette
             </button>
           </div>
@@ -111,7 +124,13 @@ export default function Dettes({ hideHeader = false }: { hideHeader?: boolean })
       )}
       {hideHeader && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+          <button 
+            className="btn btn-primary" 
+            onClick={handleOpenModal}
+            disabled={isSuspended}
+            style={{ opacity: isSuspended ? 0.6 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }}
+            title={isSuspended ? "Action bloquée : Compte suspendu" : undefined}
+          >
             + Enregistrer une dette
           </button>
         </div>
@@ -159,9 +178,12 @@ export default function Dettes({ hideHeader = false }: { hideHeader?: boolean })
                   <td>
                     <span 
                       className={`badge ${debt.status === 'paid' ? 'badge-success' : 'badge-error'}`}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => toggleDebtStatus(debt.id)}
-                      title="Cliquer pour changer de statut"
+                      style={{ cursor: isSuspended ? 'not-allowed' : 'pointer', opacity: isSuspended ? 0.7 : 1 }}
+                      onClick={() => {
+                        if (!checkCanPerformAction("le règlement de dette")) return;
+                        toggleDebtStatus(debt.id);
+                      }}
+                      title={isSuspended ? "Compte suspendu : Règlement désactivé" : "Cliquer pour changer de statut"}
                     >
                       {debt.status === 'paid' ? 'Payé' : 'Non payé'}
                     </span>
@@ -170,7 +192,13 @@ export default function Dettes({ hideHeader = false }: { hideHeader?: boolean })
                     <button className="btn-ghost" style={{ padding: '4px', color: 'var(--primary)' }} onClick={() => downloadPDF(debt)} title="Télécharger Fiche PDF">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     </button>
-                    <button className="btn-ghost" style={{ padding: '4px', color: 'var(--color-error)' }} onClick={() => handleDeleteDebt(debt.id)} title="Supprimer la dette">
+                    <button 
+                      className="btn-ghost" 
+                      style={{ padding: '4px', color: 'var(--color-error)', opacity: isSuspended ? 0.4 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }} 
+                      onClick={() => handleDeleteDebt(debt.id)} 
+                      disabled={isSuspended}
+                      title={isSuspended ? "Compte suspendu : Suppression impossible" : "Supprimer la dette"}
+                    >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                     </button>
                   </td>

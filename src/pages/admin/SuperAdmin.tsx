@@ -79,34 +79,64 @@ export default function SuperAdmin() {
     });
   };
 
-  const handleToggleStatus = (userId: string, currentStatus?: 'active' | 'suspended') => {
+  const [processingId, setProcessingId] = useState<string | null>(null);
+
+  const handleToggleStatus = async (userId: string, currentStatus?: 'active' | 'suspended') => {
     const nextStatus = currentStatus === 'suspended' ? 'active' : 'suspended';
-    updateUserStatus(userId, nextStatus);
-    addToast({
-      title: 'Statut utilisateur modifié',
-      message: `Le compte a été ${nextStatus === 'active' ? 'réactivé' : 'suspendu'}.`,
-      type: 'info'
-    });
+    setProcessingId(userId);
+    try {
+      await updateUserStatus(userId, nextStatus);
+      await refreshUsers();
+      addToast({
+        title: 'Statut utilisateur modifié',
+        message: `Le compte a été ${nextStatus === 'active' ? 'réactivé avec succès' : 'suspendu (mode consultation seule activé)'}.`,
+        type: 'info'
+      });
+    } catch (e) {
+      addToast({ title: 'Erreur', message: 'Impossible de modifier le statut.', type: 'error' });
+    } finally {
+      setProcessingId(null);
+    }
   };
 
-  const handleTogglePlan = (userId: string, currentPlan?: 'free' | 'pro') => {
+  const handleTogglePlan = async (userId: string, currentPlan?: 'free' | 'pro') => {
     const nextPlan = currentPlan === 'pro' ? 'free' : 'pro';
-    updateUserPlan(userId, nextPlan);
-    addToast({
-      title: 'Formule mise à jour',
-      message: `Le compte est désormais en formule ${nextPlan.toUpperCase()}.`,
-      type: 'success'
-    });
+    setProcessingId(userId);
+    try {
+      await updateUserPlan(userId, nextPlan);
+      await refreshUsers();
+      addToast({
+        title: 'Formule mise à jour',
+        message: `Le compte est désormais en formule ${nextPlan.toUpperCase()}.`,
+        type: 'success'
+      });
+    } catch (e) {
+      addToast({ title: 'Erreur', message: 'Impossible de modifier la formule.', type: 'error' });
+    } finally {
+      setProcessingId(null);
+    }
   };
 
-  const handleDeleteUser = (userId: string, userName: string) => {
+  const handleDeleteUser = async (userId: string, userName: string) => {
     if (userId === currentUser?.id) {
       addToast({ title: 'Action impossible', message: 'Vous ne pouvez pas supprimer votre propre compte Super Admin.', type: 'error' });
       return;
     }
-    if (window.confirm(`Confirmez-vous la suppression définitive du compte de ${userName} ? Ses accès seront révoqués.`)) {
-      deletePlatformUser(userId);
-      addToast({ title: 'Compte supprimé', message: `Le compte de ${userName} a été supprimé.`, type: 'success' });
+    if (window.confirm(`Confirmez-vous la suppression définitive du compte de ${userName} ?\n\nAttention : L'utilisateur sera éliminé de la base de données. Pour accéder à nouveau au site, il devra impérativement se réinscrire.`)) {
+      setProcessingId(userId);
+      try {
+        await deletePlatformUser(userId);
+        await refreshUsers();
+        addToast({ 
+          title: 'Compte définitivement supprimé', 
+          message: `Le compte de ${userName} a été éliminé de la base de données.`, 
+          type: 'success' 
+        });
+      } catch (e) {
+        addToast({ title: 'Erreur', message: 'Impossible de supprimer le compte.', type: 'error' });
+      } finally {
+        setProcessingId(null);
+      }
     }
   };
 
@@ -382,7 +412,7 @@ export default function SuperAdmin() {
                   onChange={e => setFormData({ ...formData, announcement: e.target.value })}
                   className="form-control"
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)' }}
-                  placeholder="Plateforme officielle Taxawou Gestion"
+                  placeholder="Plateforme officielle Taxawu Gestion"
                 />
               </div>
             </div>
@@ -563,7 +593,7 @@ export default function SuperAdmin() {
                       </td>
 
                       <td>
-                        <span style={{ fontWeight: 500 }}>{user.shopName || 'Boutique Taxawou'}</span>
+                        <span style={{ fontWeight: 500 }}>{user.shopName || 'Boutique Taxawu'}</span>
                       </td>
 
                       <td>
@@ -588,11 +618,12 @@ export default function SuperAdmin() {
 
                       <td style={{ textAlign: 'right' }}>
                         {!isSuper ? (
-                          <div style={{ display: 'inline-flex', gap: '6px' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                             <button
                               className="btn btn-outline"
                               onClick={() => handleTogglePlan(user.id, user.plan)}
-                              style={{ padding: '6px 10px', fontSize: '12px' }}
+                              disabled={processingId === user.id}
+                              style={{ padding: '6px 10px', fontSize: '12px', opacity: processingId === user.id ? 0.6 : 1 }}
                               title="Basculer entre Gratuit et Pro"
                             >
                               {isPro ? 'Passer Gratuit' : 'Passer Pro ⭐'}
@@ -601,10 +632,12 @@ export default function SuperAdmin() {
                             <button
                               className="btn btn-outline"
                               onClick={() => handleToggleStatus(user.id, user.status)}
+                              disabled={processingId === user.id}
                               style={{ 
                                 padding: '6px 10px', 
                                 fontSize: '12px', 
-                                color: user.status === 'suspended' ? 'var(--color-success)' : 'var(--color-warning)' 
+                                color: user.status === 'suspended' ? 'var(--color-success)' : 'var(--color-warning)',
+                                opacity: processingId === user.id ? 0.6 : 1
                               }}
                             >
                               {user.status === 'suspended' ? 'Activer' : 'Suspendre'}
@@ -613,7 +646,8 @@ export default function SuperAdmin() {
                             <button
                               className="btn btn-outline"
                               onClick={() => handleDeleteUser(user.id, user.name)}
-                              style={{ padding: '6px 10px', fontSize: '12px', color: 'var(--color-error)' }}
+                              disabled={processingId === user.id}
+                              style={{ padding: '6px 10px', fontSize: '12px', color: 'var(--color-error)', opacity: processingId === user.id ? 0.6 : 1 }}
                             >
                               Supprimer
                             </button>

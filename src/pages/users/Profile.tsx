@@ -279,7 +279,7 @@ export default function Profile() {
                 }} 
               />
               <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>
-                Votre e-mail est votre identifiant unique sur Taxawou et ne peut pas être modifié manuellement.
+                Votre e-mail est votre identifiant unique sur Taxawu et ne peut pas être modifié manuellement.
               </span>
             </div>
 

@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import type { Supplier } from '../../types';
 
 export default function Suppliers({ hideHeader = false }: { hideHeader?: boolean }) {
-  const { suppliers, setSuppliers, deleteSupplier, addToast } = useApp();
+  const { suppliers, setSuppliers, deleteSupplier, addToast, isSuspended, checkCanPerformAction } = useApp();
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
@@ -30,11 +30,13 @@ export default function Suppliers({ hideHeader = false }: { hideHeader?: boolean
   };
 
   const openNew = () => {
+    if (!checkCanPerformAction("l'ajout de fournisseur")) return;
     resetForm();
     setShowModal(true);
   };
 
   const openEdit = (supplier: Supplier) => {
+    if (!checkCanPerformAction("la modification de fournisseur")) return;
     setEditingSupplier(supplier);
     setFormName(supplier.name);
     setFormContactName(supplier.contactName || '');
@@ -45,6 +47,7 @@ export default function Suppliers({ hideHeader = false }: { hideHeader?: boolean
   };
 
   const handleSubmit = () => {
+    if (!checkCanPerformAction("l'enregistrement de fournisseur")) return;
     if (!formName.trim() || !formPhone.trim()) {
       addToast({ title: 'Erreur', message: 'L\'entreprise et le téléphone sont obligatoires.', type: 'error' });
       return;
@@ -76,6 +79,7 @@ export default function Suppliers({ hideHeader = false }: { hideHeader?: boolean
   };
 
   const handleDelete = (id: string) => {
+    if (!checkCanPerformAction("la suppression de fournisseur")) return;
     const supplier = suppliers.find(s => s.id === id);
     deleteSupplier(id);
     addToast({ title: 'Fournisseur supprimé', message: `${supplier?.name || 'Le fournisseur'} a été retiré.`, type: 'success' });
@@ -90,7 +94,13 @@ export default function Suppliers({ hideHeader = false }: { hideHeader?: boolean
               <h1>Fournisseurs</h1>
               <p>Gérez vos fournisseurs et vos contacts d'approvisionnement.</p>
             </div>
-            <button className="btn btn-primary" onClick={openNew}>
+            <button 
+              className="btn btn-primary" 
+              onClick={openNew}
+              disabled={isSuspended}
+              style={{ opacity: isSuspended ? 0.6 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }}
+              title={isSuspended ? "Action bloquée : Compte suspendu" : undefined}
+            >
               + Ajouter un fournisseur
             </button>
           </div>
@@ -98,7 +108,13 @@ export default function Suppliers({ hideHeader = false }: { hideHeader?: boolean
       )}
       {hideHeader && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-          <button className="btn btn-primary" onClick={openNew}>
+          <button 
+            className="btn btn-primary" 
+            onClick={openNew}
+            disabled={isSuspended}
+            style={{ opacity: isSuspended ? 0.6 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }}
+            title={isSuspended ? "Action bloquée : Compte suspendu" : undefined}
+          >
             + Ajouter un fournisseur
           </button>
         </div>
@@ -136,10 +152,22 @@ export default function Suppliers({ hideHeader = false }: { hideHeader?: boolean
                   <td>{supplier.phone}</td>
                   <td>{supplier.email || '-'}</td>
                   <td style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
-                    <button className="btn-ghost" style={{ padding: '4px' }} onClick={() => openEdit(supplier)} title="Modifier">
+                    <button 
+                      className="btn-ghost" 
+                      style={{ padding: '4px', opacity: isSuspended ? 0.4 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }} 
+                      onClick={() => openEdit(supplier)} 
+                      disabled={isSuspended}
+                      title={isSuspended ? "Compte suspendu : Modification impossible" : "Modifier"}
+                    >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                     </button>
-                    <button className="btn-ghost" style={{ padding: '4px', color: 'var(--color-error)' }} onClick={() => handleDelete(supplier.id)} title="Supprimer">
+                    <button 
+                      className="btn-ghost" 
+                      style={{ padding: '4px', color: 'var(--color-error)', opacity: isSuspended ? 0.4 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }} 
+                      onClick={() => handleDelete(supplier.id)} 
+                      disabled={isSuspended}
+                      title={isSuspended ? "Compte suspendu : Suppression impossible" : "Supprimer"}
+                    >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                     </button>
                   </td>

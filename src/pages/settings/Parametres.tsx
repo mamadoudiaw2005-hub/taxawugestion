@@ -33,7 +33,9 @@ export default function Parametres() {
     products,
     sales,
     customers,
-    currentUser
+    currentUser,
+    isSuspended,
+    checkCanPerformAction
   } = useApp();
 
   // Local state for the settings form
@@ -71,6 +73,7 @@ export default function Parametres() {
 
   const handleSave = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (!checkCanPerformAction("la modification des paramètres")) return;
     setIsSaving(true);
 
     try {
@@ -124,7 +127,7 @@ export default function Parametres() {
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
-      doc.text('TAXAWOU GESTION - RAPPORT DE SAUVEGARDE', 14, 14);
+      doc.text('TAXAWU GESTION - RAPPORT DE SAUVEGARDE', 14, 14);
 
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
@@ -233,7 +236,7 @@ export default function Parametres() {
         doc.setFontSize(8);
         doc.setTextColor(140);
         doc.text(
-          `Page ${i} sur ${pageCount} - Taxawou Gestion - Sauvegarde PDF officielle`,
+          `Page ${i} sur ${pageCount} - Taxawu Gestion - Sauvegarde PDF officielle`,
           105,
           290,
           { align: 'center' }
@@ -322,7 +325,7 @@ export default function Parametres() {
               </h1>
             </div>
             <p className="page-subtitle" style={{ margin: '6px 0 0 0', color: 'var(--text-secondary, #64748b)', fontSize: '14px' }}>
-              Personnalisez la monnaie principale, les coordonnées et les préférences de caisse de Taxawou Gestion.
+              Personnalisez la monnaie principale, les coordonnées et les préférences de caisse de Taxawu Gestion.
             </p>
           </div>
 
@@ -331,7 +334,8 @@ export default function Parametres() {
             type="button"
             className="btn btn-primary"
             onClick={() => handleSave()}
-            disabled={isSaving}
+            disabled={isSaving || isSuspended}
+            title={isSuspended ? "Action désactivée : compte suspendu" : undefined}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -344,7 +348,8 @@ export default function Parametres() {
               transition: 'all 0.2s ease',
               backgroundColor: savedSuccess ? '#16a34a' : undefined,
               borderColor: savedSuccess ? '#16a34a' : undefined,
-              cursor: isSaving ? 'not-allowed' : 'pointer'
+              cursor: (isSaving || isSuspended) ? 'not-allowed' : 'pointer',
+              opacity: isSuspended ? 0.6 : 1
             }}
           >
             {isSaving ? (
@@ -877,7 +882,8 @@ export default function Parametres() {
           <button 
             type="submit" 
             className="btn btn-primary"
-            disabled={isSaving}
+            disabled={isSaving || isSuspended}
+            title={isSuspended ? "Action désactivée : compte suspendu" : undefined}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -889,7 +895,8 @@ export default function Parametres() {
               boxShadow: '0 4px 14px rgba(79, 70, 229, 0.3)',
               backgroundColor: savedSuccess ? '#16a34a' : undefined,
               borderColor: savedSuccess ? '#16a34a' : undefined,
-              cursor: isSaving ? 'not-allowed' : 'pointer',
+              cursor: (isSaving || isSuspended) ? 'not-allowed' : 'pointer',
+              opacity: isSuspended ? 0.6 : 1,
               transition: 'all 0.2s ease'
             }}
           >

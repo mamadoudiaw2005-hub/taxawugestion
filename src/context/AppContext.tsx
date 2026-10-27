@@ -100,11 +100,13 @@ interface AppContextType {
   // Super Admin & Platform control
   platformSettings: PlatformSettings;
   updatePlatformSettings: (settings: Partial<PlatformSettings>) => void;
-  updateUserStatus: (userId: string, status: 'active' | 'suspended') => void;
-  updateUserPlan: (userId: string, plan: 'free' | 'pro') => void;
-  deletePlatformUser: (userId: string) => void;
+  updateUserStatus: (userId: string, status: 'active' | 'suspended') => Promise<void>;
+  updateUserPlan: (userId: string, plan: 'free' | 'pro') => Promise<void>;
+  deletePlatformUser: (userId: string) => Promise<void>;
   switchUser: (user: User) => void;
   isSuperAdmin: boolean;
+  isSuspended: boolean;
+  checkCanPerformAction: (actionName?: string) => boolean;
 
   // Shop & Currency settings
   currency: string;
@@ -164,7 +166,7 @@ const defaultPlatformSettings: PlatformSettings = {
   facebook: 'https://facebook.com/taxawugestion',
   tiktok: 'https://tiktok.com/@taxawugestion',
   linkedin: 'https://linkedin.com/company/taxawugestion',
-  announcement: 'Plateforme officielle Taxawou Gestion.',
+  announcement: 'Plateforme officielle Taxawu Gestion.',
   enableFreePlan: true,
   enablePaidPlan: true,
   proMonthlyPrice: 15000,
@@ -296,18 +298,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
       if (!error && data && data.length > 0) {
-        const mappedUsers: User[] = data.map(p => ({
-          id: p.id,
-          name: p.name || p.email?.split('@')[0] || 'Utilisateur',
-          email: p.email,
-          role: (p.role as any) || 'admin',
-          shopName: p.shop_name || 'Boutique',
-          phone: p.phone || undefined,
-          plan: (p.plan as any) || 'pro',
-          status: (p.status as any) || 'active',
-          avatar: p.avatar_url || undefined,
-          createdAt: p.created_at ? p.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
-        }));
+        const mappedUsers: User[] = data.map(p => {
+          const overrideStatus = localStorage.getItem(`taxawou_user_status_${p.id}`) as 'active' | 'suspended' | null;
+          const overridePlan = localStorage.getItem(`taxawou_user_plan_${p.id}`) as 'free' | 'pro' | null;
+
+          return {
+            id: p.id,
+            name: p.name || p.email?.split('@')[0] || 'Utilisateur',
+            email: p.email,
+            role: (p.role as any) || 'admin',
+            shopName: p.shop_name || 'Boutique',
+            phone: p.phone || undefined,
+            plan: overridePlan || (p.plan as any) || 'pro',
+            status: overrideStatus || (p.status as any) || 'active',
+            avatar: p.avatar_url || undefined,
+            createdAt: p.created_at ? p.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
+          };
+        });
 
         // Conserver le Super Admin dans la liste si pas encore présent dans la table SQL
         const hasSuperAdmin = mappedUsers.some(u => u.role === 'super_admin' || u.email === 'admin@taxawu.com');
@@ -315,6 +322,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const mergedUsers = (!hasSuperAdmin && defaultSuperAdmin) ? [defaultSuperAdmin, ...mappedUsers] : mappedUsers;
 
         setUsers(mergedUsers);
+        try {
+          localStorage.setItem('taxawou_users', JSON.stringify(mergedUsers));
+        } catch (e) {}
       }
     } catch (e) {
       console.warn('Erreur chargement utilisateurs Supabase:', e);
@@ -328,43 +338,88 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const extractProfile = (u: any): User => ({
-      id: u.id,
-      name: u.user_metadata?.name || u.user_metadata?.full_name || u.email?.split('@')[0] || 'Utilisateur',
-      email: u.email || '',
-      shopName: u.user_metadata?.shopName || ('Boutique ' + (u.user_metadata?.name || u.user_metadata?.full_name || 'Taxawou')),
-      role: (u.user_metadata?.role as any) || 'admin',
-      avatar: u.user_metadata?.avatar_url || u.user_metadata?.picture || undefined,
-      status: 'active',
-      plan: 'pro',
-      createdAt: new Date().toISOString().split('T')[0]
-    });
+    const buildUserFromProfile = (u: any, profile?: any): User => {
+      const overrideStatus = localStorage.getItem(`taxawou_user_status_${u.id}`) as 'active' | 'suspended' | null;
+      const overridePlan = localStorage.getItem(`taxawou_user_plan_${u.id}`) as 'free' | 'pro' | null;
 
-    const syncProfileToSupabase = async (authUser: any) => {
+      return {
+        id: u.id,
+        name: profile?.name || u.user_metadata?.name || u.user_metadata?.full_name || u.email?.split('@')[0] || 'Utilisateur',
+        email: profile?.email || u.email || '',
+        shopName: profile?.shop_name || u.user_metadata?.shopName || ('Boutique ' + (profile?.name || u.user_metadata?.name || 'Taxawu')),
+        role: (profile?.role as any) || (u.user_metadata?.role as any) || 'admin',
+        avatar: profile?.avatar_url || u.user_metadata?.avatar_url || u.user_metadata?.picture || undefined,
+        phone: profile?.phone || undefined,
+        status: overrideStatus || (profile?.status as any) || 'active',
+        plan: overridePlan || (profile?.plan as any) || 'pro',
+        createdAt: profile?.created_at ? profile.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
+      };
+    };
+
+    const syncProfileToSupabase = async (authUser: any, existingProf?: any) => {
       if (!isSupabaseConfigured || !supabase || !authUser?.id) return;
       try {
-        const name = authUser.user_metadata?.name || 
+        const name = existingProf?.name ||
+                     authUser.user_metadata?.name || 
                      authUser.user_metadata?.full_name || 
                      authUser.email?.split('@')[0] || 
                      'Utilisateur';
-        const avatarUrl = authUser.user_metadata?.avatar_url || 
+        const avatarUrl = existingProf?.avatar_url ||
+                          authUser.user_metadata?.avatar_url || 
                           authUser.user_metadata?.picture || 
                           null;
-        const shopName = authUser.user_metadata?.shopName || 
+        const shopName = existingProf?.shop_name ||
+                         authUser.user_metadata?.shopName || 
                          authUser.user_metadata?.shop_name || 
                          ('Boutique ' + name);
 
-        await supabase.from('profiles').upsert({
-          id: authUser.id,
-          name: name,
-          email: authUser.email || '',
-          role: authUser.user_metadata?.role || 'admin',
-          shop_name: shopName,
-          avatar_url: avatarUrl,
-          status: 'active'
-        }, { onConflict: 'id' });
+        if (existingProf) {
+          // Mettre à jour uniquement les métadonnées de présentation SANS écraser le statut ni le plan
+          await supabase.from('profiles').update({
+            name,
+            avatar_url: avatarUrl,
+            shop_name: shopName,
+            updated_at: new Date().toISOString()
+          }).eq('id', authUser.id);
+        } else {
+          // Nouveau profil
+          await supabase.from('profiles').insert({
+            id: authUser.id,
+            name: name,
+            email: authUser.email || '',
+            role: authUser.user_metadata?.role || 'admin',
+            shop_name: shopName,
+            avatar_url: avatarUrl,
+            status: 'active',
+            plan: 'pro'
+          });
+        }
       } catch (err) {
         console.warn('Sync profile to Supabase warning:', err);
+      }
+    };
+
+    const handleAuthUser = async (sessionUser: any) => {
+      if (!isSupabaseConfigured || !supabase || !sessionUser) return;
+      try {
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', sessionUser.id).maybeSingle();
+
+        // Si le profil n'existe plus dans la table profiles (supprimé définitivement par le Super Admin)
+        if (!profile) {
+          console.warn('Compte introuvable dans profiles (supprimé de la base). Déconnexion immédiate.');
+          await supabaseAuth.signOut();
+          setCurrentUser(null);
+          sessionStorage.removeItem('taxawou_currentUser');
+          localStorage.removeItem('taxawou_currentUser');
+          return;
+        }
+
+        const mapped = buildUserFromProfile(sessionUser, profile);
+        setCurrentUser(mapped);
+        sessionStorage.setItem('taxawou_currentUser', JSON.stringify(mapped));
+        await syncProfileToSupabase(sessionUser, profile);
+      } catch (err) {
+        console.warn('Erreur vérification profil utilisateur:', err);
       }
     };
 
@@ -381,8 +436,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        setCurrentUser(extractProfile(session.user));
-        await syncProfileToSupabase(session.user);
+        await handleAuthUser(session.user);
       } else {
         const sessionUser = loadSessionInitial<User | null>('currentUser', null);
         if (sessionUser && sessionUser.role !== 'super_admin') {
@@ -398,8 +452,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        setCurrentUser(extractProfile(session.user));
-        await syncProfileToSupabase(session.user);
+        await handleAuthUser(session.user);
         refreshUsers();
       } else if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
@@ -553,49 +606,132 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  // Global deletion handlers
+  const isSuperAdmin = currentUser?.role === 'super_admin' || currentUser?.email === 'admin@taxawu.com';
+  const isSuspended = Boolean(currentUser && currentUser.status === 'suspended' && !isSuperAdmin);
+
+  // Méthode de vérification des droits d'action
+  const checkCanPerformAction = useCallback((actionName = 'cette action'): boolean => {
+    if (isSuspended) {
+      addToast({
+        title: 'Compte suspendu',
+        message: `Votre compte est actuellement suspendu par l'administrateur. Vous êtes en mode consultation (lecture seule) : impossible d'effectuer ${actionName}.`,
+        type: 'warning'
+      });
+      return false;
+    }
+    return true;
+  }, [isSuspended, addToast]);
+
+  // Surveillance en temps réel du statut et de l'existence du compte connecté
+  useEffect(() => {
+    const client = supabase;
+    if (!isSupabaseConfigured || !client || !currentUser?.id || isSuperAdmin) return;
+
+    let isMounted = true;
+    const checkLiveProfile = async () => {
+      try {
+        const { data: profile } = await client.from('profiles').select('status, plan').eq('id', currentUser.id).maybeSingle();
+        if (!isMounted) return;
+
+        // 1. Si le profil n'existe plus dans Supabase -> Compte supprimé par le Super Admin
+        if (!profile) {
+          addToast({
+            title: 'Compte supprimé',
+            message: 'Votre compte a été définitivement supprimé par l\'administration. Pour vous reconnecter, vous devez vous réinscrire.',
+            type: 'error'
+          });
+          await logout();
+          return;
+        }
+
+        // 2. Si le statut de suspension a changé
+        const overrideStatus = localStorage.getItem(`taxawou_user_status_${currentUser.id}`) as 'active' | 'suspended' | null;
+        if (profile.status && profile.status !== currentUser.status) {
+          if (overrideStatus && overrideStatus !== profile.status) {
+            // Un changement local récent prime sur l'état non synchronisé de Supabase
+          } else {
+            setCurrentUser(prev => prev ? { ...prev, status: profile.status as any } : null);
+            localStorage.setItem(`taxawou_user_status_${currentUser.id}`, profile.status);
+            if (profile.status === 'suspended') {
+              addToast({
+                title: 'Compte suspendu',
+                message: 'Votre compte vient d\'être suspendu par l\'administrateur. Vos données restent visibles en mode consultation (lecture seule).',
+                type: 'warning'
+              });
+            } else if (profile.status === 'active') {
+              addToast({
+                title: 'Compte réactivé',
+                message: 'Votre compte a été réactivé avec succès ! Vous pouvez à nouveau effectuer vos opérations.',
+                type: 'success'
+              });
+            }
+          }
+        }
+
+        // 3. Si la formule a changé
+        if (profile.plan && profile.plan !== currentUser.plan) {
+          setCurrentUser(prev => prev ? { ...prev, plan: profile.plan as any } : null);
+        }
+      } catch (err) {
+        // ignorer erreurs réseau ponctuelles
+      }
+    };
+
+    const timer = setInterval(checkLiveProfile, 4000);
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, [currentUser?.id, currentUser?.status, currentUser?.plan, isSuperAdmin, logout, addToast]);
+
+  // Global deletion handlers sécurisés
   const deleteProduct = useCallback((id: string) => {
+    if (!checkCanPerformAction('la suppression de produit')) return;
     setProducts(prev => prev.filter(p => p.id !== id));
-  }, []);
+  }, [checkCanPerformAction]);
 
   const deleteCategory = useCallback((id: string) => {
+    if (!checkCanPerformAction('la suppression de catégorie')) return;
     setCategories(prev => prev.filter(c => c.id !== id));
-  }, []);
+  }, [checkCanPerformAction]);
 
   const deleteCustomer = useCallback((id: string) => {
+    if (!checkCanPerformAction('la suppression de client')) return;
     setCustomers(prev => prev.filter(c => c.id !== id));
-  }, []);
+  }, [checkCanPerformAction]);
 
   const deleteSupplier = useCallback((id: string) => {
+    if (!checkCanPerformAction('la suppression de fournisseur')) return;
     setSuppliers(prev => prev.filter(s => s.id !== id));
-  }, []);
+  }, [checkCanPerformAction]);
 
   const deleteExpense = useCallback((id: string) => {
+    if (!checkCanPerformAction('la suppression de dépense')) return;
     setExpenses(prev => prev.filter(e => e.id !== id));
-  }, []);
+  }, [checkCanPerformAction]);
 
   const deleteDebt = useCallback((id: string) => {
+    if (!checkCanPerformAction('la suppression de dette')) return;
     setDebts(prev => prev.filter(d => d.id !== id));
-  }, []);
+  }, [checkCanPerformAction]);
 
   const toggleDebtStatus = useCallback((id: string) => {
+    if (!checkCanPerformAction('la mise à jour de statut de dette')) return;
     setDebts(prev => prev.map(d => d.id === id ? {
       ...d,
       status: d.status === 'paid' ? 'unpaid' : 'paid'
     } : d));
-  }, []);
+  }, [checkCanPerformAction]);
 
   const deleteSale = useCallback((id: string) => {
+    if (!checkCanPerformAction('la suppression de vente')) return;
     setSales(prev => prev.filter(s => s.id !== id));
-  }, []);
+  }, [checkCanPerformAction]);
 
   const deletePurchase = useCallback((id: string) => {
+    if (!checkCanPerformAction('la suppression de commande d\'achat')) return;
     setPurchases(prev => prev.filter(p => p.id !== id));
-  }, []);
-
-  const deleteUser = useCallback((id: string) => {
-    setUsers(prev => prev.filter(u => u.id !== id));
-  }, []);
+  }, [checkCanPerformAction]);
 
   const updatePlatformSettings = useCallback((newSettings: Partial<PlatformSettings>) => {
     setPlatformSettings(prev => {
@@ -611,19 +747,143 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const updateUserStatus = useCallback((userId: string, status: 'active' | 'suspended') => {
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
-  }, []);
+  const updateUserStatus = useCallback(async (userId: string, status: 'active' | 'suspended') => {
+    // 1. Sauvegarde immédiate du statut dans le cache persistant par utilisateur
+    try {
+      localStorage.setItem(`taxawou_user_status_${userId}`, status);
+    } catch (e) {
+      console.warn('localStorage error', e);
+    }
 
-  const updateUserPlan = useCallback((userId: string, plan: 'free' | 'pro') => {
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan } : u));
-  }, []);
+    // 2. Mise à jour de la mémoire locale et de la liste globale
+    setUsers(prev => {
+      const updated = prev.map(u => u.id === userId ? { ...u, status } : u);
+      try {
+        localStorage.setItem('taxawou_users', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
 
-  const deletePlatformUser = useCallback((userId: string) => {
+    if (currentUser?.id === userId) {
+      setCurrentUser(prev => {
+        if (!prev) return null;
+        const updated = { ...prev, status };
+        try {
+          sessionStorage.setItem('taxawou_currentUser', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+    }
+
+    // 3. Persistance dans la base de données Supabase (Table profiles)
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { error: rpcErr } = await supabase.rpc('update_user_status_by_admin', {
+          target_user_id: userId,
+          new_status: status
+        });
+        if (rpcErr) {
+          console.warn('RPC update_user_status_by_admin notice:', rpcErr.message);
+        }
+        // Mise à jour directe de profiles
+        const { error: directErr } = await supabase.from('profiles').update({ 
+          status, 
+          updated_at: new Date().toISOString() 
+        }).eq('id', userId);
+        if (directErr) {
+          console.warn('Direct update profiles status notice:', directErr.message);
+        }
+      } catch (e) {
+        console.warn('Erreur updateUserStatus Supabase:', e);
+      }
+    }
+  }, [currentUser?.id]);
+
+  const updateUserPlan = useCallback(async (userId: string, plan: 'free' | 'pro') => {
+    try {
+      localStorage.setItem(`taxawou_user_plan_${userId}`, plan);
+    } catch (e) {}
+
+    setUsers(prev => {
+      const updated = prev.map(u => u.id === userId ? { ...u, plan } : u);
+      try {
+        localStorage.setItem('taxawou_users', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    if (currentUser?.id === userId) {
+      setCurrentUser(prev => {
+        if (!prev) return null;
+        const updated = { ...prev, plan };
+        try {
+          sessionStorage.setItem('taxawou_currentUser', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+    }
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { error: rpcErr } = await supabase.rpc('update_user_plan_by_admin', {
+          target_user_id: userId,
+          new_plan: plan
+        });
+        if (rpcErr) {
+          console.warn('RPC update_user_plan_by_admin notice:', rpcErr.message);
+        }
+        await supabase.from('profiles').update({ 
+          plan, 
+          updated_at: new Date().toISOString() 
+        }).eq('id', userId);
+      } catch (e) {
+        console.warn('Erreur updateUserPlan Supabase:', e);
+      }
+    }
+  }, [currentUser?.id]);
+
+  const deletePlatformUser = useCallback(async (userId: string) => {
+    // 1. Suppression de la mémoire locale et du cache
     setUsers(prev => prev.filter(u => u.id !== userId));
-    const keys = ['products', 'categories', 'customers', 'suppliers', 'expenses', 'debts', 'sales', 'purchases', 'stockMovements'];
+    const keys = ['products', 'categories', 'customers', 'suppliers', 'expenses', 'debts', 'sales', 'purchases', 'stockMovements', 'shop_settings', 'currency'];
     keys.forEach(k => localStorage.removeItem(`taxawou_${userId}_${k}`));
-  }, []);
+
+    // Si l'utilisateur supprimé est actuellement connecté
+    if (currentUser?.id === userId) {
+      setCurrentUser(null);
+      sessionStorage.removeItem('taxawou_currentUser');
+      localStorage.removeItem('taxawou_currentUser');
+    }
+
+    // 2. Suppression définitive de la base de données Supabase (BDD et Auth.users)
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { error: rpcErr } = await supabase.rpc('delete_user_by_admin', {
+          target_user_id: userId
+        });
+
+        if (rpcErr) {
+          console.warn('Fallback suppression tables directe:', rpcErr);
+          await supabase.from('stock_movements').delete().eq('user_id', userId);
+          await supabase.from('debts').delete().eq('user_id', userId);
+          await supabase.from('expenses').delete().eq('user_id', userId);
+          await supabase.from('sales').delete().eq('user_id', userId);
+          await supabase.from('suppliers').delete().eq('user_id', userId);
+          await supabase.from('customers').delete().eq('user_id', userId);
+          await supabase.from('products').delete().eq('user_id', userId);
+          await supabase.from('categories').delete().eq('user_id', userId);
+          await supabase.from('shop_settings').delete().eq('user_id', userId);
+          await supabase.from('profiles').delete().eq('id', userId);
+        }
+      } catch (e) {
+        console.warn('Erreur deletePlatformUser Supabase:', e);
+      }
+    }
+  }, [currentUser?.id]);
+
+  const deleteUser = useCallback((id: string) => {
+    deletePlatformUser(id);
+  }, [deletePlatformUser]);
 
   const switchUser = useCallback((user: User) => {
     setCurrentUser(user);
@@ -643,6 +903,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [currentUserId]);
 
   const updateShopSettings = useCallback((newSettings: Partial<ShopSettings>) => {
+    if (!checkCanPerformAction('la modification des paramètres')) return;
     setShopSettings(prev => {
       const updated = { ...prev, ...newSettings };
       localStorage.setItem(`taxawou_${currentUserId}_shop_settings`, JSON.stringify(updated));
@@ -658,13 +919,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setCurrentUser(updatedUser);
       setUsers(all => all.map(u => u.id === currentUser.id ? updatedUser : u));
     }
-  }, [currentUserId, currentUser, setCurrentUser, setUsers]);
+  }, [currentUserId, currentUser, setCurrentUser, setUsers, checkCanPerformAction]);
 
   const formatCurrencyContext = useCallback((amount: number, customCurr?: string) => {
     return formatCurrency(amount, customCurr || currency);
   }, [currency]);
-
-  const isSuperAdmin = currentUser?.role === 'super_admin' || currentUser?.email === 'admin@taxawu.com';
 
   return (
     <AppContext.Provider value={{
@@ -733,6 +992,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deletePlatformUser,
       switchUser,
       isSuperAdmin,
+      isSuspended,
+      checkCanPerformAction,
 
       currency,
       setCurrency,

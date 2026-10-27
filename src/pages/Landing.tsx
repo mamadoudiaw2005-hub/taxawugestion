@@ -36,7 +36,7 @@ export default function Landing() {
                 Gérez votre activité avec <span className="hero-title-gradient">simplicité</span>
               </h1>
               <p className="hero-subtitle">
-                Taxawou est la solution complète pour piloter vos ventes, vos stocks, et vos finances en temps réel. Une interface moderne conçue pour vous faire gagner du temps.
+                Taxawu est la solution complète pour piloter vos ventes, vos stocks, et vos finances en temps réel. Une interface moderne conçue pour vous faire gagner du temps.
               </p>
               
               <div className="hero-actions">

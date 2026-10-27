@@ -4,7 +4,7 @@ import { formatCurrency } from '../../data/mockData';
 import type { Product, Sale } from '../../types';
 
 export default function PointOfSale() {
-  const { products: allProducts, setProducts, setSales, addToast } = useApp();
+  const { products: allProducts, setProducts, setSales, addToast, isSuspended, checkCanPerformAction } = useApp();
   const [cart, setCart] = useState<{ id: string; name: string; price: number; qty: number }[]>([]);
   const [search, setSearch] = useState('');
   const [discount, setDiscount] = useState<{ type: 'percent' | 'fixed', value: number }>({ type: 'percent', value: 0 });
@@ -32,6 +32,7 @@ export default function PointOfSale() {
   }, [cart, paidAmount]);
 
   const addToCart = (product: Product) => {
+    if (!checkCanPerformAction("l'ajout d'article au panier")) return;
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
@@ -57,6 +58,7 @@ export default function PointOfSale() {
   const change = typeof paidAmount === 'number' ? Math.max(0, paidAmount - total) : 0;
 
   const checkout = () => {
+    if (!checkCanPerformAction("la validation de la vente")) return;
     if (cart.length === 0) return;
     if (typeof paidAmount === 'number' && paidAmount < total) {
       addToast({ title: 'Erreur', message: 'Le montant payé est insuffisant', type: 'error' });
@@ -187,8 +189,20 @@ export default function PointOfSale() {
           )}
         </div>
         <div className="pos-cart-actions">
-          <button className="btn btn-primary" onClick={checkout} disabled={cart.length === 0} style={{ padding: '14px', fontSize: 16 }}>
-            Encaisser {formatCurrency(total)}
+          <button 
+            className="btn btn-primary" 
+            onClick={checkout} 
+            disabled={cart.length === 0 || isSuspended} 
+            style={{ 
+              padding: '14px', 
+              fontSize: 16, 
+              opacity: isSuspended ? 0.6 : 1, 
+              cursor: isSuspended ? 'not-allowed' : 'pointer',
+              background: isSuspended ? '#9ca3af' : undefined
+            }}
+            title={isSuspended ? "Encaissement impossible : Compte suspendu" : undefined}
+          >
+            {isSuspended ? "🔒 Caisse suspendue (Lecture seule)" : `Encaisser ${formatCurrency(total)}`}
           </button>
         </div>
       </div>

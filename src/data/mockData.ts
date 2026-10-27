@@ -1,13 +1,13 @@
-// Données fictives de démonstration pour Taxawou Gestion
+// Données fictives de démonstration pour Taxawu Gestion
 // Ces données sont utilisées uniquement pour la simulation front-end
 
 import type { Product, Category, Customer, Supplier, Sale, Purchase, Expense, Debt, StockMovement, Notification, User } from '../types';
 
 // ============ UTILISATEURS ============
 export const mockUsers: User[] = [
-  { id: 'u1', name: 'Mamadou Diaw', email: 'admin@taxawu.com', role: 'super_admin', phone: '77 123 45 67', createdAt: '2024-01-15', shopName: 'Taxawou Administration', status: 'active', plan: 'pro' },
-  { id: 'u2', name: 'Fatou Sall', email: 'fatou@taxawou.sn', role: 'admin', phone: '78 234 56 78', createdAt: '2024-03-10', shopName: 'Épicerie Centrale Dakar', status: 'active', plan: 'free' },
-  { id: 'u3', name: 'Ousmane Ba', email: 'ousmane@taxawou.sn', role: 'admin', phone: '76 345 67 89', createdAt: '2024-06-20', shopName: 'Boutique Ba & Frères', status: 'active', plan: 'pro' },
+  { id: 'u1', name: 'Mamadou Diaw', email: 'admin@taxawu.com', role: 'super_admin', phone: '77 123 45 67', createdAt: '2024-01-15', shopName: 'Taxawu Administration', status: 'active', plan: 'pro' },
+  { id: 'u2', name: 'Fatou Sall', email: 'fatou@taxawu.sn', role: 'admin', phone: '78 234 56 78', createdAt: '2024-03-10', shopName: 'Épicerie Centrale Dakar', status: 'active', plan: 'free' },
+  { id: 'u3', name: 'Ousmane Ba', email: 'ousmane@taxawu.sn', role: 'admin', phone: '76 345 67 89', createdAt: '2024-06-20', shopName: 'Boutique Ba & Frères', status: 'active', plan: 'pro' },
 ];
 
 // ============ CATÉGORIES ============

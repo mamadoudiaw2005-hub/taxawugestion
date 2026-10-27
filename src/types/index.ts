@@ -1,4 +1,4 @@
-// Types partagés pour Taxawou Gestion
+// Types partagés pour Taxawu Gestion
 
 export interface User {
   id: string;

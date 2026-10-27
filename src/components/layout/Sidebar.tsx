@@ -69,10 +69,6 @@ export default function Sidebar() {
     ] : [])
   ];
 
-  const toggleGroup = (id: string) => {
-    setOpenGroups(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
@@ -80,6 +76,31 @@ export default function Sidebar() {
 
   const isGroupActive = (children: { path: string }[]) => {
     return children.some(child => isActive(child.path));
+  };
+
+  // Ouvrir automatiquement le groupe parent correspondant à la route lors d'une nouvelle navigation
+  useEffect(() => {
+    allNavItems.forEach(item => {
+      if ('isGroup' in item && item.isGroup && item.id && item.children) {
+        if (item.children.some(child => isActive(child.path))) {
+          setOpenGroups(prev => ({ ...prev, [item.id!]: true }));
+        }
+      }
+    });
+  }, [location.pathname]);
+
+  const toggleGroup = (id: string) => {
+    setOpenGroups(prev => {
+      let isCurrentlyOpen = prev[id];
+      if (typeof isCurrentlyOpen !== 'boolean') {
+        const matchingGroup = allNavItems.find(item => 'id' in item && item.id === id && 'children' in item);
+        isCurrentlyOpen = matchingGroup && 'children' in matchingGroup ? isGroupActive(matchingGroup.children || []) : false;
+      }
+      return {
+        ...prev,
+        [id]: !isCurrentlyOpen
+      };
+    });
   };
 
   const isCollapsed = sidebarCollapsed && !mobileSidebarOpen;
@@ -102,7 +123,7 @@ export default function Sidebar() {
         <div className="sidebar-header">
           <div className="sidebar-logo">T</div>
           <div className="sidebar-brand" onClick={handleNavClick} style={{ cursor: 'pointer' }}>
-            <h1>Taxawou</h1>
+            <h1>Taxawu</h1>
             <p>Pilotage de votre activité</p>
           </div>
           <button 
@@ -130,7 +151,9 @@ export default function Sidebar() {
             }
             if ('isGroup' in item && item.isGroup) {
               const active = isGroupActive(item.children || []);
-              const open = openGroups[item.id!] || active;
+              const open = typeof openGroups[item.id!] === 'boolean' 
+                ? openGroups[item.id!] 
+                : active;
               return (
                 <div key={item.id} className="sidebar-group">
                   <div 
@@ -155,7 +178,6 @@ export default function Sidebar() {
                           className={`sidebar-link ${isActive(child.path) ? 'active' : ''}`}
                           style={{ padding: '8px 12px', fontSize: '0.9rem' }}
                           onClick={handleNavClick}
-                          onTouchEnd={handleNavClick}
                         >
                           <span className="sidebar-link-text">{child.label}</span>
                         </NavLink>
@@ -172,7 +194,6 @@ export default function Sidebar() {
                   to={item.path}
                   className={`sidebar-link ${isActive(item.path) ? 'active' : ''}`}
                   onClick={handleNavClick}
-                  onTouchEnd={handleNavClick}
                 >
                   <span className="sidebar-link-icon">
                     {item.icon && icons[item.icon]}

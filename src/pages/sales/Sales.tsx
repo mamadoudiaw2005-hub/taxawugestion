@@ -6,7 +6,7 @@ import { formatCurrency, formatDateTime } from '../../data/mockData';
 import type { Sale } from '../../types';
 
 export default function Sales() {
-  const { sales, deleteSale, addToast, shopSettings, currency } = useApp();
+  const { sales, deleteSale, addToast, shopSettings, currency, isSuspended, checkCanPerformAction } = useApp();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   
@@ -20,7 +20,7 @@ export default function Sales() {
   const downloadJournalPDF = () => {
     try {
       const doc = new jsPDF();
-      const shopTitle = shopSettings?.shopName || 'Taxawou Gestion';
+      const shopTitle = shopSettings?.shopName || 'Taxawu Gestion';
 
       doc.setFillColor(79, 70, 229);
       doc.rect(0, 0, 210, 28, 'F');
@@ -62,7 +62,7 @@ export default function Sales() {
   const downloadSaleInvoice = (sale: Sale) => {
     try {
       const doc = new jsPDF();
-      const shopTitle = shopSettings?.shopName || 'Taxawou Gestion';
+      const shopTitle = shopSettings?.shopName || 'Taxawu Gestion';
 
       // Header Facture
       doc.setFillColor(15, 23, 42);
@@ -210,12 +210,14 @@ export default function Sales() {
                     </button>
                     <button 
                       className="btn-ghost" 
-                      style={{ padding: '6px', color: 'var(--color-error)' }}
+                      style={{ padding: '6px', color: 'var(--color-error)', opacity: isSuspended ? 0.4 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }}
                       onClick={() => {
+                        if (!checkCanPerformAction("la suppression de commande")) return;
                         deleteSale(sale.id);
                         addToast({ title: 'Commande supprimée', message: `Commande ${sale.reference} retirée.`, type: 'success' });
                       }}
-                      title="Supprimer la commande"
+                      disabled={isSuspended}
+                      title={isSuspended ? "Compte suspendu : Suppression impossible" : "Supprimer la commande"}
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                     </button>

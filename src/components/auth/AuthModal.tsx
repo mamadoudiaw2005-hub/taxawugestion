@@ -203,28 +203,55 @@ export default function AuthModal({ initialTab = 'login', onClose }: AuthModalPr
         }
 
         const sbUser = data.user;
+        let profileData: any = null;
+        if (supabase) {
+          const { data: prof } = await supabase.from('profiles').select('*').eq('id', sbUser.id).maybeSingle();
+          profileData = prof;
+        }
+
+        // Si le compte a été supprimé de la base de données par le Super Admin
+        if (!profileData && supabase) {
+          await supabaseAuth.signOut();
+          const msg = 'Ce compte n\'existe plus ou a été supprimé par l\'administrateur. Veuillez cliquer sur "Créer un compte" ci-dessus pour vous réinscrire.';
+          setErrorMessage(msg);
+          addToast({ title: 'Compte supprimé', message: msg, type: 'error' });
+          setIsSubmitting(false);
+          return;
+        }
+
         const loggedUser: User = {
           id: sbUser.id,
-          name: sbUser.user_metadata?.name || emailClean.split('@')[0].replace(/[._-]/g, ' '),
-          email: sbUser.email || emailClean,
-          shopName: sbUser.user_metadata?.shopName || ('Boutique ' + (sbUser.user_metadata?.name || emailClean.split('@')[0])),
-          role: (sbUser.user_metadata?.role as any) || 'admin',
-          status: 'active',
-          plan: 'pro',
-          createdAt: new Date().toISOString().split('T')[0]
+          name: profileData?.name || sbUser.user_metadata?.name || emailClean.split('@')[0].replace(/[._-]/g, ' '),
+          email: profileData?.email || sbUser.email || emailClean,
+          shopName: profileData?.shop_name || sbUser.user_metadata?.shopName || ('Boutique ' + (profileData?.name || emailClean.split('@')[0])),
+          role: (profileData?.role as any) || (sbUser.user_metadata?.role as any) || 'admin',
+          status: (profileData?.status as any) || 'active',
+          plan: (profileData?.plan as any) || 'pro',
+          avatar: profileData?.avatar_url || sbUser.user_metadata?.avatar_url || undefined,
+          phone: profileData?.phone || undefined,
+          createdAt: profileData?.created_at ? profileData.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
         };
 
         setCurrentUser(loggedUser);
+        sessionStorage.setItem('taxawou_currentUser', JSON.stringify(loggedUser));
         setUsers(prev => {
           const exists = prev.find(u => u.id === loggedUser.id || u.email.toLowerCase() === loggedUser.email.toLowerCase());
-          return exists ? prev : [...prev, loggedUser];
+          return exists ? prev.map(u => u.id === loggedUser.id ? loggedUser : u) : [...prev, loggedUser];
         });
 
-        addToast({ 
-          title: 'Connexion réussie', 
-          message: `Ravi de vous revoir, ${loggedUser.name} !`, 
-          type: 'success' 
-        });
+        if (loggedUser.status === 'suspended') {
+          addToast({ 
+            title: 'Compte suspendu', 
+            message: `Bienvenue ${loggedUser.name}. Votre compte est actuellement en mode consultation uniquement.`, 
+            type: 'warning' 
+          });
+        } else {
+          addToast({ 
+            title: 'Connexion réussie', 
+            message: `Ravi de vous revoir, ${loggedUser.name} !`, 
+            type: 'success' 
+          });
+        }
         navigate('/dashboard');
         return;
       }
@@ -640,7 +667,7 @@ export default function AuthModal({ initialTab = 'login', onClose }: AuthModalPr
               />
             </div>
             <span style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '0.5px', color: '#15803d' }}>
-              TAXAWOU
+              TAXAWU
             </span>
           </div>
           <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#64748b' }}>

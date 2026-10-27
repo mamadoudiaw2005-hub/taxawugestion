@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import type { Category } from '../../types';
 
 export default function Categories({ hideHeader = false }: { hideHeader?: boolean }) {
-  const { categories, setCategories, deleteCategory, addToast } = useApp();
+  const { categories, setCategories, deleteCategory, addToast, isSuspended, checkCanPerformAction } = useApp();
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
@@ -20,11 +20,13 @@ export default function Categories({ hideHeader = false }: { hideHeader?: boolea
   };
 
   const openNew = () => {
+    if (!checkCanPerformAction("l'ajout de catégorie")) return;
     resetForm();
     setShowModal(true);
   };
 
   const openEdit = (category: Category) => {
+    if (!checkCanPerformAction("la modification de catégorie")) return;
     setEditingCategory(category);
     setFormName(category.name);
     setFormDescription(category.description || '');
@@ -33,6 +35,7 @@ export default function Categories({ hideHeader = false }: { hideHeader?: boolea
   };
 
   const handleSubmit = () => {
+    if (!checkCanPerformAction("l'enregistrement de catégorie")) return;
     if (!formName.trim()) {
       addToast({ title: 'Erreur', message: 'Le nom de la catégorie est obligatoire.', type: 'error' });
       return;
@@ -59,6 +62,7 @@ export default function Categories({ hideHeader = false }: { hideHeader?: boolea
   };
 
   const handleDelete = (id: string) => {
+    if (!checkCanPerformAction("la suppression de catégorie")) return;
     const cat = categories.find(c => c.id === id);
     deleteCategory(id);
     addToast({ title: 'Catégorie supprimée', message: `${cat?.name || 'La catégorie'} a été retirée.`, type: 'success' });
@@ -73,7 +77,13 @@ export default function Categories({ hideHeader = false }: { hideHeader?: boolea
               <h1>Catégories</h1>
               <p>Gérez les familles de produits.</p>
             </div>
-            <button className="btn btn-primary" onClick={openNew}>
+            <button 
+              className="btn btn-primary" 
+              onClick={openNew}
+              disabled={isSuspended}
+              style={{ opacity: isSuspended ? 0.6 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }}
+              title={isSuspended ? "Action bloquée : Compte suspendu" : undefined}
+            >
               + Nouvelle Catégorie
             </button>
           </div>
@@ -81,7 +91,13 @@ export default function Categories({ hideHeader = false }: { hideHeader?: boolea
       )}
       {hideHeader && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-          <button className="btn btn-primary" onClick={openNew}>
+          <button 
+            className="btn btn-primary" 
+            onClick={openNew}
+            disabled={isSuspended}
+            style={{ opacity: isSuspended ? 0.6 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }}
+            title={isSuspended ? "Action bloquée : Compte suspendu" : undefined}
+          >
             + Nouvelle Catégorie
           </button>
         </div>
@@ -107,10 +123,22 @@ export default function Categories({ hideHeader = false }: { hideHeader?: boolea
                 <td style={{ color: 'var(--text-muted)' }}>{cat.description || '—'}</td>
                 <td>{cat.productCount} produits</td>
                 <td style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
-                  <button className="btn-ghost" style={{ padding: '4px' }} onClick={() => openEdit(cat)} title="Modifier">
+                  <button 
+                    className="btn-ghost" 
+                    style={{ padding: '4px', opacity: isSuspended ? 0.4 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }} 
+                    onClick={() => openEdit(cat)} 
+                    disabled={isSuspended}
+                    title={isSuspended ? "Compte suspendu : Modification impossible" : "Modifier"}
+                  >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                   </button>
-                  <button className="btn-ghost" style={{ padding: '4px', color: 'var(--color-error)' }} onClick={() => handleDelete(cat.id)} title="Supprimer">
+                  <button 
+                    className="btn-ghost" 
+                    style={{ padding: '4px', color: 'var(--color-error)', opacity: isSuspended ? 0.4 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }} 
+                    onClick={() => handleDelete(cat.id)} 
+                    disabled={isSuspended}
+                    title={isSuspended ? "Compte suspendu : Suppression impossible" : "Supprimer"}
+                  >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                   </button>
                 </td>

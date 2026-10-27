@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
@@ -27,16 +28,19 @@ const PAYMENT_LABELS: Record<string, string> = {
 type PeriodFilter = 'today' | '7days' | 'month' | 'year' | 'all';
 
 export default function ChiffreAffaires({ hideHeader = false }: { hideHeader?: boolean }) {
-  const { sales, expenses, products } = useApp();
+  const navigate = useNavigate();
+  const { sales = [], expenses = [], products = [] } = useApp();
   const [period, setPeriod] = useState<PeriodFilter>('month');
   const [search, setSearch] = useState('');
 
   // Filtrer les ventes selon la période sélectionnée
   const filteredSales = useMemo(() => {
     const now = new Date();
-    return sales.filter(sale => {
-      if (sale.status === 'cancelled') return false;
-      const saleDate = new Date(sale.createdAt);
+    const safeSales = Array.isArray(sales) ? sales : [];
+    return safeSales.filter(sale => {
+      if (!sale || sale.status === 'cancelled') return false;
+      const saleDate = sale.createdAt ? new Date(sale.createdAt) : new Date();
+      if (isNaN(saleDate.getTime())) return true;
 
       if (period === 'today') {
         return saleDate.toDateString() === now.toDateString();
@@ -58,8 +62,12 @@ export default function ChiffreAffaires({ hideHeader = false }: { hideHeader?: b
   // Filtrer les dépenses selon la même période pour le calcul de marge
   const filteredExpenses = useMemo(() => {
     const now = new Date();
-    return expenses.filter(exp => {
-      const expDate = new Date(exp.date);
+    const safeExpenses = Array.isArray(expenses) ? expenses : [];
+    return safeExpenses.filter(exp => {
+      if (!exp) return false;
+      const expDate = exp.date ? new Date(exp.date) : new Date();
+      if (isNaN(expDate.getTime())) return true;
+
       if (period === 'today') return expDate.toDateString() === now.toDateString();
       if (period === '7days') return (now.getTime() - expDate.getTime()) / (1000 * 3600 * 24) <= 7;
       if (period === 'month') return expDate.getMonth() === now.getMonth() && expDate.getFullYear() === now.getFullYear();
@@ -70,24 +78,28 @@ export default function ChiffreAffaires({ hideHeader = false }: { hideHeader?: b
 
   // Calculs KPI
   const totalCA = useMemo(() => {
-    return filteredSales.reduce((sum, s) => sum + s.total, 0);
+    return filteredSales.reduce((sum, s) => sum + (Number(s?.total) || 0), 0);
   }, [filteredSales]);
 
   const totalEncaisse = useMemo(() => {
-    return filteredSales.reduce((sum, s) => sum + s.paid, 0);
+    return filteredSales.reduce((sum, s) => sum + (Number(s?.paid) || 0), 0);
   }, [filteredSales]);
 
   const totalDepenses = useMemo(() => {
-    return filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+    return filteredExpenses.reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
   }, [filteredExpenses]);
 
   // Coût des marchandises vendues (COGS estimé)
   const totalCoutAchat = useMemo(() => {
+    const safeProducts = Array.isArray(products) ? products : [];
     return filteredSales.reduce((acc, sale) => {
-      const itemsCost = sale.items.reduce((sub, item) => {
-        const prod = products.find(p => p.id === item.productId);
-        const buyPrice = prod?.buyPrice || (item.unitPrice * 0.7);
-        return sub + (buyPrice * item.quantity);
+      if (!sale) return acc;
+      const items = Array.isArray(sale.items) ? sale.items : [];
+      const itemsCost = items.reduce((sub, item) => {
+        if (!item) return sub;
+        const prod = safeProducts.find(p => p.id === item.productId);
+        const buyPrice = prod?.buyPrice || (item.unitPrice ? item.unitPrice * 0.7 : 0);
+        return sub + (buyPrice * (item.quantity || 0));
       }, 0);
       return acc + itemsCost;
     }, 0);
@@ -102,11 +114,13 @@ export default function ChiffreAffaires({ hideHeader = false }: { hideHeader?: b
   const chartData = useMemo(() => {
     const map: Record<string, number> = {};
     filteredSales.forEach(s => {
-      const d = new Date(s.createdAt);
+      if (!s) return;
+      const d = s.createdAt ? new Date(s.createdAt) : new Date();
+      const validDate = isNaN(d.getTime()) ? new Date() : d;
       const key = period === 'today' 
-        ? `${d.getHours()}h` 
-        : `${d.getDate()}/${d.getMonth() + 1}`;
-      map[key] = (map[key] || 0) + s.total;
+        ? `${validDate.getHours()}h` 
+        : `${validDate.getDate()}/${validDate.getMonth() + 1}`;
+      map[key] = (map[key] || 0) + (Number(s.total) || 0);
     });
 
     const entries = Object.entries(map).map(([date, montant]) => ({ date, montant }));
@@ -117,8 +131,9 @@ export default function ChiffreAffaires({ hideHeader = false }: { hideHeader?: b
   const paymentBreakdown = useMemo(() => {
     const map: Record<string, number> = {};
     filteredSales.forEach(s => {
+      if (!s) return;
       const m = s.paymentMethod || 'cash';
-      map[m] = (map[m] || 0) + s.total;
+      map[m] = (map[m] || 0) + (Number(s.total) || 0);
     });
     return Object.entries(map).map(([method, total]) => ({
       name: PAYMENT_LABELS[method] || method,
@@ -131,12 +146,16 @@ export default function ChiffreAffaires({ hideHeader = false }: { hideHeader?: b
   const topProducts = useMemo(() => {
     const map: Record<string, { name: string; quantity: number; revenue: number }> = {};
     filteredSales.forEach(s => {
-      s.items.forEach(it => {
-        if (!map[it.productId]) {
-          map[it.productId] = { name: it.productName, quantity: 0, revenue: 0 };
+      if (!s) return;
+      const items = Array.isArray(s.items) ? s.items : [];
+      items.forEach(it => {
+        if (!it) return;
+        const key = it.productId || it.productName || 'inconnu';
+        if (!map[key]) {
+          map[key] = { name: it.productName || 'Article', quantity: 0, revenue: 0 };
         }
-        map[it.productId].quantity += it.quantity;
-        map[it.productId].revenue += it.total;
+        map[key].quantity += Number(it.quantity) || 0;
+        map[key].revenue += Number(it.total) || 0;
       });
     });
     return Object.values(map)
@@ -146,19 +165,25 @@ export default function ChiffreAffaires({ hideHeader = false }: { hideHeader?: b
 
   // Ventes filtrées par recherche textuelle
   const displayedSales = useMemo(() => {
-    return filteredSales.filter(s => 
-      s.reference.toLowerCase().includes(search.toLowerCase()) ||
-      (s.customerName && s.customerName.toLowerCase().includes(search.toLowerCase())) ||
-      (s.createdBy && s.createdBy.toLowerCase().includes(search.toLowerCase()))
-    );
+    const q = search.trim().toLowerCase();
+    return filteredSales.filter(s => {
+      if (!s) return false;
+      if (!q) return true;
+      const ref = s.reference || '';
+      const cName = s.customerName || '';
+      const cBy = s.createdBy || '';
+      return ref.toLowerCase().includes(q) ||
+        cName.toLowerCase().includes(q) ||
+        cBy.toLowerCase().includes(q);
+    });
   }, [filteredSales, search]);
 
   // Export PDF Professionnel
   const handleExportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(18);
-    doc.setTextColor(22, 101, 52); // Vert Taxawou
-    doc.text('Taxawou Gestion - Rapport du Chiffre d\'Affaires', 14, 20);
+    doc.setTextColor(22, 101, 52); // Vert Taxawu
+    doc.text('Taxawu Gestion - Rapport du Chiffre d\'Affaires', 14, 20);
     
     doc.setFontSize(10);
     doc.setTextColor(100);
@@ -256,6 +281,15 @@ export default function ChiffreAffaires({ hideHeader = false }: { hideHeader?: b
                   </button>
                 ))}
               </div>
+
+              <button 
+                className="btn btn-outline"
+                onClick={() => navigate('/dashboard')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                title="Retourner au Tableau de bord"
+              >
+                ← Tableau de bord
+              </button>
 
               <button 
                 className="btn btn-outline"

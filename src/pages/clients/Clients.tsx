@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import type { Customer } from '../../types';
 
 export default function Clients({ hideHeader = false }: { hideHeader?: boolean }) {
-  const { customers, setCustomers, deleteCustomer, addToast } = useApp();
+  const { customers, setCustomers, deleteCustomer, addToast, isSuspended, checkCanPerformAction } = useApp();
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -28,11 +28,13 @@ export default function Clients({ hideHeader = false }: { hideHeader?: boolean }
   };
 
   const openNew = () => {
+    if (!checkCanPerformAction("l'ajout de client")) return;
     resetForm();
     setShowModal(true);
   };
 
   const openEdit = (customer: Customer) => {
+    if (!checkCanPerformAction("la modification de client")) return;
     setEditingCustomer(customer);
     setFormName(customer.name);
     setFormPhone(customer.phone);
@@ -42,6 +44,7 @@ export default function Clients({ hideHeader = false }: { hideHeader?: boolean }
   };
 
   const handleSubmit = () => {
+    if (!checkCanPerformAction("l'enregistrement de client")) return;
     if (!formName.trim() || !formPhone.trim()) {
       addToast({ title: 'Erreur', message: 'Le nom et le téléphone sont obligatoires.', type: 'error' });
       return;
@@ -72,6 +75,7 @@ export default function Clients({ hideHeader = false }: { hideHeader?: boolean }
   };
 
   const handleDelete = (id: string) => {
+    if (!checkCanPerformAction("la suppression de client")) return;
     const customer = customers.find(c => c.id === id);
     deleteCustomer(id);
     addToast({ title: 'Client supprimé', message: `${customer?.name || 'Le client'} a été retiré.`, type: 'success' });
@@ -86,7 +90,13 @@ export default function Clients({ hideHeader = false }: { hideHeader?: boolean }
               <h1>Clients</h1>
               <p>Gérez les informations et l'historique de vos clients.</p>
             </div>
-            <button className="btn btn-primary" onClick={openNew}>
+            <button 
+              className="btn btn-primary" 
+              onClick={openNew}
+              disabled={isSuspended}
+              style={{ opacity: isSuspended ? 0.6 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }}
+              title={isSuspended ? "Action bloquée : Compte suspendu" : undefined}
+            >
               + Ajouter un client
             </button>
           </div>
@@ -94,7 +104,13 @@ export default function Clients({ hideHeader = false }: { hideHeader?: boolean }
       )}
       {hideHeader && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-          <button className="btn btn-primary" onClick={openNew}>
+          <button 
+            className="btn btn-primary" 
+            onClick={openNew}
+            disabled={isSuspended}
+            style={{ opacity: isSuspended ? 0.6 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }}
+            title={isSuspended ? "Action bloquée : Compte suspendu" : undefined}
+          >
             + Ajouter un client
           </button>
         </div>
@@ -132,10 +148,22 @@ export default function Clients({ hideHeader = false }: { hideHeader?: boolean }
                   <td>{client.email || '-'}</td>
                   <td>{client.address || '-'}</td>
                   <td style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
-                    <button className="btn-ghost" style={{ padding: '4px' }} onClick={() => openEdit(client)} title="Modifier">
+                    <button 
+                      className="btn-ghost" 
+                      style={{ padding: '4px', opacity: isSuspended ? 0.4 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }} 
+                      onClick={() => openEdit(client)} 
+                      disabled={isSuspended}
+                      title={isSuspended ? "Compte suspendu : Modification impossible" : "Modifier"}
+                    >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                     </button>
-                    <button className="btn-ghost" style={{ padding: '4px', color: 'var(--color-error)' }} onClick={() => handleDelete(client.id)} title="Supprimer">
+                    <button 
+                      className="btn-ghost" 
+                      style={{ padding: '4px', color: 'var(--color-error)', opacity: isSuspended ? 0.4 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }} 
+                      onClick={() => handleDelete(client.id)} 
+                      disabled={isSuspended}
+                      title={isSuspended ? "Compte suspendu : Suppression impossible" : "Supprimer"}
+                    >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                     </button>
                   </td>

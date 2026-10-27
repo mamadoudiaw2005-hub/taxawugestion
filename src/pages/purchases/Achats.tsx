@@ -4,7 +4,7 @@ import { formatCurrency, formatDate } from '../../data/mockData';
 import type { Purchase } from '../../types';
 
 export default function Achats({ hideHeader = false }: { hideHeader?: boolean }) {
-  const { purchases, setPurchases, deletePurchase, suppliers, addToast } = useApp();
+  const { purchases, setPurchases, deletePurchase, suppliers, addToast, isSuspended, checkCanPerformAction } = useApp();
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
@@ -27,11 +27,13 @@ export default function Achats({ hideHeader = false }: { hideHeader?: boolean })
   };
 
   const openNew = () => {
+    if (!checkCanPerformAction("l'enregistrement d'achat")) return;
     resetForm();
     setShowModal(true);
   };
 
   const openEdit = (purchase: Purchase) => {
+    if (!checkCanPerformAction("la modification d'achat")) return;
     setEditingPurchase(purchase);
     setSupplierId(purchase.supplierId);
     setItems([...purchase.items]);
@@ -62,6 +64,7 @@ export default function Achats({ hideHeader = false }: { hideHeader?: boolean })
   const totalAmount = items.reduce((sum, item) => sum + item.total, 0);
 
   const handleSubmit = () => {
+    if (!checkCanPerformAction("l'enregistrement d'achat")) return;
     if (!supplierId || items.length === 0) {
       addToast({ title: 'Erreur', message: 'Veuillez sélectionner un fournisseur et ajouter des produits.', type: 'error' });
       return;
@@ -90,6 +93,7 @@ export default function Achats({ hideHeader = false }: { hideHeader?: boolean })
   };
 
   const handleDelete = (id: string) => {
+    if (!checkCanPerformAction("la suppression d'achat")) return;
     deletePurchase(id);
     addToast({ title: 'Achat supprimé', message: 'La commande a été supprimée.', type: 'success' });
   };
@@ -103,7 +107,13 @@ export default function Achats({ hideHeader = false }: { hideHeader?: boolean })
               <h1>Achats</h1>
               <p>Historique de vos commandes auprès des fournisseurs.</p>
             </div>
-            <button className="btn btn-primary" onClick={openNew}>
+            <button 
+              className="btn btn-primary" 
+              onClick={openNew}
+              disabled={isSuspended}
+              style={{ opacity: isSuspended ? 0.6 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }}
+              title={isSuspended ? "Action bloquée : Compte suspendu" : undefined}
+            >
               + Nouvel Achat
             </button>
           </div>
@@ -111,7 +121,13 @@ export default function Achats({ hideHeader = false }: { hideHeader?: boolean })
       )}
       {hideHeader && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-          <button className="btn btn-primary" onClick={openNew}>
+          <button 
+            className="btn btn-primary" 
+            onClick={openNew}
+            disabled={isSuspended}
+            style={{ opacity: isSuspended ? 0.6 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }}
+            title={isSuspended ? "Action bloquée : Compte suspendu" : undefined}
+          >
             + Nouvel Achat
           </button>
         </div>
@@ -158,10 +174,22 @@ export default function Achats({ hideHeader = false }: { hideHeader?: boolean })
                     </span>
                   </td>
                   <td style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
-                    <button className="btn-ghost" style={{ padding: '4px' }} onClick={() => openEdit(purchase)} title="Modifier">
+                    <button 
+                      className="btn-ghost" 
+                      style={{ padding: '4px', opacity: isSuspended ? 0.4 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }} 
+                      onClick={() => openEdit(purchase)} 
+                      disabled={isSuspended}
+                      title={isSuspended ? "Compte suspendu : Modification impossible" : "Modifier"}
+                    >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                     </button>
-                    <button className="btn-ghost" style={{ padding: '4px', color: 'var(--color-error)' }} onClick={() => handleDelete(purchase.id)} title="Supprimer">
+                    <button 
+                      className="btn-ghost" 
+                      style={{ padding: '4px', color: 'var(--color-error)', opacity: isSuspended ? 0.4 : 1, cursor: isSuspended ? 'not-allowed' : 'pointer' }} 
+                      onClick={() => handleDelete(purchase.id)} 
+                      disabled={isSuspended}
+                      title={isSuspended ? "Compte suspendu : Suppression impossible" : "Supprimer"}
+                    >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                     </button>
                   </td>

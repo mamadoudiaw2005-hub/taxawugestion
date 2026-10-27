@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext';
 import type { User } from '../../types';
 
 export default function Utilisateurs() {
-  const { users, setUsers, deleteUser, addToast, isSuperAdmin, currentUser, refreshUsers } = useApp();
+  const { users, setUsers, deleteUser, addToast, isSuperAdmin, currentUser, refreshUsers, isSuspended, checkCanPerformAction } = useApp();
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
 
@@ -42,11 +42,13 @@ export default function Utilisateurs() {
   };
 
   const openNew = () => {
+    if (!checkCanPerformAction("l'ajout d'utilisateur")) return;
     resetForm();
     setShowModal(true);
   };
 
   const handleSubmit = () => {
+    if (!checkCanPerformAction("l'ajout d'utilisateur")) return;
     if (!formName.trim() || !formEmail.trim()) {
       addToast({ title: 'Erreur', message: 'Le nom et l\'email sont obligatoires.', type: 'error' });
       return;
@@ -66,9 +68,10 @@ export default function Utilisateurs() {
     resetForm();
   };
 
-  const handleDelete = (id: string) => {
-    deleteUser(id);
-    addToast({ title: 'Utilisateur supprimé', message: 'L\'utilisateur a été retiré.', type: 'success' });
+  const handleDelete = async (id: string) => {
+    if (!checkCanPerformAction("la suppression d'utilisateur")) return;
+    await deleteUser(id);
+    addToast({ title: 'Utilisateur supprimé', message: 'L\'utilisateur a été définitivement retiré.', type: 'success' });
   };
 
   return (
@@ -79,7 +82,12 @@ export default function Utilisateurs() {
             <h1>Utilisateurs</h1>
             <p>Gérez les accès à la plateforme.</p>
           </div>
-          <button className="btn btn-primary" onClick={openNew}>
+          <button 
+            className="btn btn-primary" 
+            onClick={openNew}
+            disabled={isSuspended}
+            title={isSuspended ? "Action désactivée : compte suspendu" : undefined}
+          >
             + Nouvel Utilisateur
           </button>
         </div>
