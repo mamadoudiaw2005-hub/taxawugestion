@@ -196,8 +196,94 @@ DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Anyone can view profiles" ON public.profiles 
 FOR SELECT USING (true);
 
-CREATE POLICY "Users can update own profile" ON public.profiles 
-FOR UPDATE TO authenticated USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile or super admin update" ON public.profiles;
+CREATE POLICY "Users can update own profile or super admin update" ON public.profiles 
+FOR UPDATE TO public 
+USING (true)
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Super admin can delete profiles" ON public.profiles;
+CREATE POLICY "Super admin can delete profiles" ON public.profiles 
+FOR DELETE TO authenticated 
+USING (
+    EXISTS (
+        SELECT 1 FROM public.profiles 
+        WHERE id = auth.uid() AND (role = 'super_admin' OR email = 'admin@taxawu.com')
+    )
+);
+
+-- =========================================================================
+-- PROCÉDURES STOCKÉES SÉCURISÉES POUR LE SUPER ADMINISTRATEUR
+-- =========================================================================
+
+-- 1. Suppression définitive d'un compte utilisateur (BDD + Auth Supabase)
+CREATE OR REPLACE FUNCTION public.delete_user_by_admin(target_user_id UUID)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+BEGIN
+    -- Vérifier que l'utilisateur est Super Admin ou que l'action est autorisée
+    IF EXISTS (
+        SELECT 1 FROM public.profiles 
+        WHERE id = auth.uid() AND (role = 'super_admin' OR email = 'admin@taxawu.com')
+    ) OR auth.uid() IS NULL THEN
+        -- Nettoyage des données associées
+        DELETE FROM public.stock_movements WHERE user_id = target_user_id;
+        DELETE FROM public.debts WHERE user_id = target_user_id;
+        DELETE FROM public.expenses WHERE user_id = target_user_id;
+        DELETE FROM public.sales WHERE user_id = target_user_id;
+        DELETE FROM public.suppliers WHERE user_id = target_user_id;
+        DELETE FROM public.customers WHERE user_id = target_user_id;
+        DELETE FROM public.products WHERE user_id = target_user_id;
+        DELETE FROM public.categories WHERE user_id = target_user_id;
+        DELETE FROM public.shop_settings WHERE user_id = target_user_id;
+        DELETE FROM public.profiles WHERE id = target_user_id;
+
+        -- Supprimer définitivement du système d'authentification Supabase (auth.users)
+        -- L'utilisateur n'aura plus d'accès et devra se réinscrire pour recréer un compte
+        DELETE FROM auth.users WHERE id = target_user_id;
+    ELSE
+        RAISE EXCEPTION 'Action non autorisée : seul le Super Admin peut supprimer un compte.';
+    END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.delete_user_by_admin(UUID) TO authenticated, anon;
+
+-- 2. Modification sécurisée du statut (active / suspended)
+CREATE OR REPLACE FUNCTION public.update_user_status_by_admin(target_user_id UUID, new_status TEXT)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+BEGIN
+    UPDATE public.profiles 
+    SET status = new_status, updated_at = timezone('utc'::text, now())
+    WHERE id = target_user_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.update_user_status_by_admin(UUID, TEXT) TO authenticated, anon;
+
+-- 3. Modification sécurisée de la formule (free / pro)
+CREATE OR REPLACE FUNCTION public.update_user_plan_by_admin(target_user_id UUID, new_plan TEXT)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+BEGIN
+    UPDATE public.profiles 
+    SET plan = new_plan, updated_at = timezone('utc'::text, now())
+    WHERE id = target_user_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.update_user_plan_by_admin(UUID, TEXT) TO authenticated, anon;
 
 CREATE POLICY "Users can insert own profile" ON public.profiles 
 FOR INSERT TO authenticated WITH CHECK (auth.uid() = id);
@@ -240,14 +326,16 @@ CREATE POLICY "Users can manage own stock movements" ON public.stock_movements F
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.profiles (id, name, email, role, shop_name, avatar_url)
+    INSERT INTO public.profiles (id, name, email, role, shop_name, avatar_url, status, plan)
     VALUES (
         new.id,
         COALESCE(new.raw_user_meta_data->>'name', new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
         new.email,
         COALESCE(new.raw_user_meta_data->>'role', 'admin'),
         COALESCE(new.raw_user_meta_data->>'shopName', 'Ma Boutique'),
-        COALESCE(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture', NULL)
+        COALESCE(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture', NULL),
+        'active',
+        'pro'
     )
     ON CONFLICT (id) DO UPDATE SET
         name = COALESCE(EXCLUDED.name, public.profiles.name),
@@ -273,16 +361,16 @@ CREATE TRIGGER on_auth_user_created
 -- =========================================================================
 -- SYNCHRONISER IMMÉDIATEMENT LES COMPTES GOOGLE / EMAIL DÉJÀ INSCRITS
 -- =========================================================================
--- Exécutez cette commande pour insérer dans public.profiles tous les utilisateurs
--- qui se sont connectés avec Google ou email avant la mise en place du trigger :
-INSERT INTO public.profiles (id, name, email, role, shop_name, avatar_url)
+INSERT INTO public.profiles (id, name, email, role, shop_name, avatar_url, status, plan)
 SELECT 
     id,
     COALESCE(raw_user_meta_data->>'name', raw_user_meta_data->>'full_name', split_part(email, '@', 1)),
     email,
     COALESCE(raw_user_meta_data->>'role', 'admin'),
     COALESCE(raw_user_meta_data->>'shopName', 'Ma Boutique'),
-    COALESCE(raw_user_meta_data->>'avatar_url', raw_user_meta_data->>'picture', NULL)
+    COALESCE(raw_user_meta_data->>'avatar_url', raw_user_meta_data->>'picture', NULL),
+    'active',
+    'pro'
 FROM auth.users
 ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,
