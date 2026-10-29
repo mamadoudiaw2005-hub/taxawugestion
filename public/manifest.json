@@ -1,24 +1,23 @@
 {
-    "name": "Taxawu Gestion",
-    "short_name": "Taxawu",
-    "description": "Plateforme de gestion commerciale et point de vente",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#15803d",
-    "orientation": "portrait-primary",
-    "icons": [
-        {
-            "src": "/logo.png",
-            "type": "image/png",
-            "sizes": "192x192",
-            "purpose": "any maskable"
-        },
-        {
-            "src": "/logo.png",
-            "type": "image/png",
-            "sizes": "512x512",
-            "purpose": "any maskable"
-        }
-    ]
+  "name": "Taxawu Gestion",
+  "short_name": "Taxawu",
+  "description": "Solution complète de gestion commerciale",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#15803d",
+  "theme_color": "#15803d",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }
