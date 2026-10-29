@@ -3,17 +3,23 @@ import { supabase } from '../../lib/supabase';
 import { Mail, Lock, User, ArrowRight, CheckCircle2, AlertCircle, X, ShieldCheck } from 'lucide-react';
 
 interface AuthModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
   initialMode?: 'login' | 'register';
+  initialTab?: string;
+  [key: string]: any;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
-  isOpen,
-  onClose,
-  initialMode = 'login',
+  isOpen = true,
+  onClose = () => {},
+  initialMode,
+  initialTab,
 }) => {
-  const [isLogin, setIsLogin] = useState(initialMode === 'login');
+  // Détermine si on affiche la connexion ou l'inscription selon initialTab ou initialMode
+  const [isLogin, setIsLogin] = useState(
+    initialTab ? initialTab === 'login' : initialMode !== 'register'
+  );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -464,4 +470,5 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     </div>
   );
 };
+
 export default AuthModal;
