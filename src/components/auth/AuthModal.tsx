@@ -32,6 +32,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // 1. Soumission Connexion / Inscription / Mot de passe oublié
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabase) {
+      setError("Le service d'authentification n'est pas initialisé.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -89,6 +94,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // 2. Validation du Code reçu (Accepte les 6 et 8 chiffres)
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabase) {
+      setError("Le service d'authentification n'est pas initialisé.");
+      return;
+    }
+
     const cleanOtp = otpCode.trim();
     if (!cleanOtp) {
       setError('Veuillez entrer le code reçu par e-mail.');
@@ -142,6 +152,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   // 3. Connexion Google
   const handleGoogleLogin = async () => {
+    if (!supabase) {
+      setError("Le service d'authentification n'est pas initialisé.");
+      return;
+    }
+
     try {
       setLoading(true);
       const { error } = await supabase.auth.signInWithOAuth({
