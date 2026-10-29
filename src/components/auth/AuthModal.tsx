@@ -12,11 +12,10 @@ interface AuthModalProps {
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen = true,
-  onClose = () => {},
+  onClose,
   initialMode,
   initialTab,
 }) => {
-  // Détermine si on affiche la connexion ou l'inscription selon initialTab ou initialMode
   const [isLogin, setIsLogin] = useState(
     initialTab ? initialTab === 'login' : initialMode !== 'register'
   );
@@ -35,6 +34,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Gestion du bouton Fermer / Croix
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    }
+    // Si on est sur la page /login ou /register, renvoyer à l'accueil
+    if (window.location.pathname.includes('/login') || window.location.pathname.includes('/register')) {
+      window.location.href = '/';
+    }
+  };
+
   // 1. Soumission Connexion / Inscription / Mot de passe oublié
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,8 +59,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     try {
       if (isResetPassword) {
-        // Envoi du code pour réinitialiser le mot de passe
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
           redirectTo: window.location.origin,
         });
         if (error) throw error;
@@ -59,16 +68,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       } else if (isLogin) {
         // Connexion normale
         const { error } = await supabase.auth.signInWithPassword({
-          email,
+          email: email.trim(),
           password,
         });
         if (error) throw error;
-        onClose();
-        window.location.reload();
+
+        // Redirection directe vers le Tableau de bord
+        window.location.href = '/dashboard';
       } else {
-        // Inscription : création de compte et déclenchement du code Supabase
+        // Inscription
         const { data, error } = await supabase.auth.signUp({
-          email,
+          email: email.trim(),
           password,
           options: {
             data: {
@@ -78,7 +88,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         });
         if (error) throw error;
 
-        // Si l'utilisateur doit confirmer son e-mail
         if (data?.user && (!data.session || data.user.identities?.length === 0)) {
           setOtpSent(true);
           setSuccess(`Un code de validation a été envoyé à ${email}.`);
@@ -86,12 +95,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           setOtpSent(true);
           setSuccess(`Un code de validation a été envoyé à ${email}.`);
         } else {
-          onClose();
-          window.location.reload();
+          window.location.href = '/dashboard';
         }
       }
     } catch (err: any) {
-      setError(err.message || "Une erreur est survenue lors de l'opération.");
+      let msg = err.message || "Une erreur est survenue lors de l'opération.";
+      if (msg.includes("Invalid login credentials")) {
+        msg = "Adresse e-mail ou mot de passe incorrect. Vérifiez vos identifiants.";
+      } else if (msg.includes("Email not confirmed")) {
+        msg = "Votre e-mail n'a pas encore été validé. Confirmez-le dans Supabase.";
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -117,7 +131,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       if (isResetPassword) {
         const { error } = await supabase.auth.verifyOtp({
-          email,
+          email: email.trim(),
           token: cleanOtp,
           type: 'recovery',
         });
@@ -132,22 +146,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         setSuccess('Mot de passe mis à jour avec succès !');
         setTimeout(() => {
-          onClose();
-          window.location.reload();
-        }, 1500);
+          window.location.href = '/dashboard';
+        }, 1200);
       } else {
         const { error } = await supabase.auth.verifyOtp({
-          email,
+          email: email.trim(),
           token: cleanOtp,
           type: 'signup',
         });
         if (error) throw error;
 
-        setSuccess('Compte validé avec succès ! Bienvenue sur Taxawu.');
+        setSuccess('Compte validé avec succès ! Redirection vers votre tableau de bord...');
         setTimeout(() => {
-          onClose();
-          window.location.reload();
-        }, 1500);
+          window.location.href = '/dashboard';
+        }, 1200);
       }
     } catch (err: any) {
       setError(err.message || 'Code invalide ou expiré. Veuillez vérifier le code reçu par e-mail.');
@@ -168,7 +180,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: `${window.location.origin}/dashboard`,
         },
       });
       if (error) throw error;
@@ -183,7 +195,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
         {/* Bouton Fermer */}
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
         >
           <X className="w-5 h-5" />
@@ -399,7 +411,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold rounded-xl shadow-lg shadow-emerald-600/30 hover:shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
                 >
                   {loading ? (
-                    'Chargement...'
+                    'Connexion en cours...'
                   ) : isResetPassword ? (
                     'Envoyer le code par e-mail'
                   ) : isLogin ? (
