@@ -1,49 +1,52 @@
 <!DOCTYPE html>
 <html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <!-- Titre officiel -->
+    <title>Taxawu - Gestion commerciale et comptabilité</title>
+    <meta name="description" content="Taxawu Gestion - Votre solution complète de facturation, gestion de stock et comptabilité." />
+    
+    <!-- Logo pour les onglets, la barre de recherche et Google Search -->
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="shortcut icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/logo.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/logo.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/logo.png" />
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Taxawu Gestion - Application de gestion commerciale moderne pour commerçants" />
-  <title>Taxawu Gestion</title>
+    <!-- Harmonisation de la couleur verte (#15803d) sur Android et iPhone -->
+    <meta name="theme-color" content="#15803d" />
+    <meta name="theme-color" content="#15803d" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#15803d" media="(prefers-color-scheme: dark)" />
 
-  <!-- Icônes officielles pour Google, PC et Android -->
-  <link rel="icon" type="image/png" href="/logo.png" />
-  <link rel="shortcut icon" href="/logo.png" />
+    <!-- Configuration iOS (PWA et barre d'état iPhone) -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Taxawu" />
 
-  <!-- Icône officielle pour iPhone (Écran d'accueil) -->
-  <link rel="apple-touch-icon" href="/logo.png" />
+    <!-- Référencement et aperçu sur WhatsApp, Google, réseaux -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Taxawu Gestion" />
+    <meta property="og:description" content="Solution complète de gestion commerciale et comptabilité." />
+    <meta property="og:image" content="https://taxawugestion.com/logo.png" />
+    <meta property="og:url" content="https://taxawugestion.com" />
 
-  <!-- Verrouillage des couleurs pour iPhone et Android -->
-  <meta name="theme-color" content="#15803d" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="Taxawu" />
-
-  <!-- Configuration PWA Téléchargeable Google Chrome -->
-  <link rel="manifest" href="/manifest.json" />
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
-    rel="stylesheet">
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-
-  <!-- Activation du Service Worker pour l'installation -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch((err) => {
-          console.log('SW registration failed:', err);
+    <!-- Manifeste PWA -->
+    <link rel="manifest" href="/manifest.json" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((reg) => console.log('Service Worker enregistré:', reg.scope))
+            .catch((err) => console.log('Erreur Service Worker:', err));
         });
-      });
-    }
-  </script>
-</head>
-
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
-</body>
-
+      }
+    </script>
+  </body>
 </html>
