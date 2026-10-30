@@ -128,7 +128,6 @@ function loadInitial<T>(key: string, fallback: T): T {
   try {
     const saved = localStorage.getItem(`taxawou_${key}`);
     if (saved) {
-      // Purge automatique des anciennes données de démo (catégories/produits mockés résiduels en cache)
       if (
         saved.includes('"id":"cat1"') || 
         saved.includes('"id":"p1"') || 
@@ -309,8 +308,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
             role: (p.role as any) || 'admin',
             shopName: p.shop_name || 'Boutique',
             phone: p.phone || undefined,
-            plan: overridePlan || (p.plan as any) || 'pro',
-            status: overrideStatus || (p.status as any) || 'active',
+            plan: (p.plan as any) || overridePlan || 'pro',
+            status: (p.status as any) || overrideStatus || 'active',
             avatar: p.avatar_url || undefined,
             createdAt: p.created_at ? p.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
           };
@@ -350,8 +349,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         role: (profile?.role as any) || (u.user_metadata?.role as any) || 'admin',
         avatar: profile?.avatar_url || u.user_metadata?.avatar_url || u.user_metadata?.picture || undefined,
         phone: profile?.phone || undefined,
-        status: overrideStatus || (profile?.status as any) || 'active',
-        plan: overridePlan || (profile?.plan as any) || 'pro',
+        status: (profile?.status as any) || overrideStatus || 'active',
+        plan: (profile?.plan as any) || overridePlan || 'pro',
         createdAt: profile?.created_at ? profile.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
       };
     };
@@ -645,26 +644,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         // 2. Si le statut de suspension a changé
-        const overrideStatus = localStorage.getItem(`taxawou_user_status_${currentUser.id}`) as 'active' | 'suspended' | null;
         if (profile.status && profile.status !== currentUser.status) {
-          if (overrideStatus && overrideStatus !== profile.status) {
-            // Un changement local récent prime sur l'état non synchronisé de Supabase
-          } else {
-            setCurrentUser(prev => prev ? { ...prev, status: profile.status as any } : null);
+          setCurrentUser(prev => {
+            if (!prev) return null;
+            const updated = { ...prev, status: profile.status as any };
+            try {
+              sessionStorage.setItem('taxawou_currentUser', JSON.stringify(updated));
+            } catch (e) {}
+            return updated;
+          });
+          try {
             localStorage.setItem(`taxawou_user_status_${currentUser.id}`, profile.status);
-            if (profile.status === 'suspended') {
-              addToast({
-                title: 'Compte suspendu',
-                message: 'Votre compte vient d\'être suspendu par l\'administrateur. Vos données restent visibles en mode consultation (lecture seule).',
-                type: 'warning'
-              });
-            } else if (profile.status === 'active') {
-              addToast({
-                title: 'Compte réactivé',
-                message: 'Votre compte a été réactivé avec succès ! Vous pouvez à nouveau effectuer vos opérations.',
-                type: 'success'
-              });
-            }
+          } catch (e) {}
+          if (profile.status === 'suspended') {
+            addToast({
+              title: 'Compte suspendu',
+              message: 'Votre compte vient d\'être suspendu par l\'administrateur. Vos données restent visibles en mode consultation (lecture seule).',
+              type: 'warning'
+            });
+          } else if (profile.status === 'active') {
+            addToast({
+              title: 'Compte réactivé',
+              message: 'Votre compte a été réactivé avec succès ! Vous pouvez à nouveau effectuer vos opérations.',
+              type: 'success'
+            });
           }
         }
 
@@ -677,10 +680,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const timer = setInterval(checkLiveProfile, 4000);
+    // Vérification immédiate au montage
+    checkLiveProfile();
+
+    // Abonnement temps réel Supabase
+    const profileChannel = client
+      .channel(`profile-sync-${currentUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${currentUser.id}`
+        },
+        () => {
+          if (isMounted) checkLiveProfile();
+        }
+      )
+      .subscribe();
+
+    const timer = setInterval(checkLiveProfile, 3000);
     return () => {
       isMounted = false;
       clearInterval(timer);
+      client.removeChannel(profileChannel);
     };
   }, [currentUser?.id, currentUser?.status, currentUser?.plan, isSuperAdmin, logout, addToast]);
 
